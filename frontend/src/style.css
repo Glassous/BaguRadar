@@ -1,0 +1,786 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans:
+    'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:
+    'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --color-canvas: var(--c-canvas);
+  --color-canvas-soft: var(--c-canvas-soft);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-ink: var(--c-ink);
+  --color-ink-soft: var(--c-ink-soft);
+  --color-ink-faint: var(--c-ink-faint);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-primary: var(--c-primary);
+  --color-primary-soft: var(--c-primary-soft);
+  --color-primary-ink: var(--c-primary-ink);
+  --color-accent: var(--c-accent);
+}
+
+:root {
+  --c-canvas: #fbfbf9;
+  --c-canvas-soft: #f3f4f1;
+  --c-surface: #ffffff;
+  --c-surface-2: #f6f7f4;
+  --c-ink: #111827;
+  --c-ink-soft: #4b5563;
+  --c-ink-faint: #8a8f98;
+  --c-line: #e5e7e1;
+  --c-line-strong: #d5d9d2;
+  --c-primary: #0d9488;
+  --c-primary-soft: #cdfbf3;
+  --c-primary-ink: #0f766e;
+  --c-accent: #d97706;
+  --c-code-bg: #f7f9f7;
+  --c-code-bar: #edf1ed;
+  --c-grid: rgba(13, 148, 136, 0.08);
+  --shadow-soft: 0 1px 2px rgba(17, 24, 39, 0.04), 0 18px 38px -22px rgba(17, 24, 39, 0.25);
+  --shadow-lift: 0 2px 6px rgba(17, 24, 39, 0.05), 0 28px 50px -24px rgba(13, 148, 136, 0.32);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark {
+  --c-canvas: #0b0f14;
+  --c-canvas-soft: #0e141b;
+  --c-surface: #111820;
+  --c-surface-2: #161e27;
+  --c-ink: #e6e9ee;
+  --c-ink-soft: #b3bcc7;
+  --c-ink-faint: #8b95a3;
+  --c-line: rgba(255, 255, 255, 0.08);
+  --c-line-strong: rgba(255, 255, 255, 0.16);
+  --c-primary: #2dd4bf;
+  --c-primary-soft: rgba(45, 212, 191, 0.14);
+  --c-primary-ink: #5eead4;
+  --c-accent: #fbbf24;
+  --c-code-bg: #0c1219;
+  --c-code-bar: #121a23;
+  --c-grid: rgba(45, 212, 191, 0.09);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.5), 0 22px 44px -26px rgba(0, 0, 0, 0.9);
+  --shadow-lift: 0 2px 8px rgba(0, 0, 0, 0.6), 0 30px 60px -28px rgba(45, 212, 191, 0.28);
+}
+
+@layer base {
+  * {
+    border-color: var(--c-line);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--c-canvas);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--c-primary);
+    color: #ffffff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+  }
+
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+}
+
+/* ---------- 滚动条（容器内滚动，静止隐藏） ---------- */
+.app-scroll,
+.scroll-area,
+.has-overlay-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-scroll::-webkit-scrollbar,
+.scroll-area::-webkit-scrollbar,
+.has-overlay-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 悬浮滚动条：滚动时淡入，停止 0.7s 后淡出 */
+.osb {
+  position: fixed;
+  z-index: 45;
+  width: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.osb.is-visible {
+  opacity: 1;
+}
+
+.osb-thumb {
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-primary) 46%, transparent),
+    color-mix(in srgb, var(--c-ink-faint) 38%, transparent)
+  );
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+  transition: background 160ms ease;
+}
+
+.osb-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c-primary) 68%, transparent),
+    color-mix(in srgb, var(--c-ink-faint) 55%, transparent)
+  );
+}
+
+.osb-thumb:active {
+  cursor: grabbing;
+}
+
+/* 设置弹窗遮罩 */
+/* 遮罩层自己承载 blur 且独立过渡：不要放进带 opacity 过渡的父容器，
+   否则合成层重建会让背景模糊晚于弹窗出现。 */
+.dialog-backdrop {
+  opacity: 0;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  transition: opacity 200ms var(--ease-out);
+}
+
+/* 挂载后的预热状态：极低不透明度仍在绘制，可让浏览器提前建立模糊采样层。
+   不加过渡，确保首帧就完成采样；is-open 时不生效。 */
+.dialog-backdrop.is-warm:not(.is-open) {
+  opacity: 0.001;
+  transition: none;
+}
+
+.dialog-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 设置弹窗内部滚动条 */
+.dialog-card {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--c-ink-faint) 32%, transparent) transparent;
+}
+
+.dialog-card::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.dialog-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dialog-card::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c-ink-faint) 32%, transparent);
+  border-radius: 999px;
+}
+
+/* 代码块与表格：保留原生细滚动条，悬停时出现 */
+.code-block pre.shiki,
+.table-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.code-block:hover pre.shiki,
+.table-scroll:hover {
+  scrollbar-color: color-mix(in srgb, var(--c-primary) 38%, var(--c-ink-faint)) transparent;
+}
+
+.code-block pre.shiki::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.code-block pre.shiki::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-block pre.shiki::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.code-block:hover pre.shiki::-webkit-scrollbar-thumb,
+.table-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--c-primary) 34%, var(--c-ink-faint));
+}
+
+/* 窄屏（侧栏收起）下隐藏所有滚动条 */
+@media (max-width: 1023.98px) {
+  html,
+  body,
+  .app-scroll,
+  .scroll-area,
+  .has-overlay-scrollbar,
+  .code-block pre.shiki,
+  .table-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  .app-scroll::-webkit-scrollbar,
+  .scroll-area::-webkit-scrollbar,
+  .has-overlay-scrollbar::-webkit-scrollbar,
+  .code-block pre.shiki::-webkit-scrollbar,
+  .table-scroll::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  .osb {
+    display: none;
+  }
+}
+
+/* ---------- 背景氛围 ---------- */
+.page-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, color-mix(in srgb, var(--c-primary) 9%, transparent), transparent 70%),
+    linear-gradient(to right, var(--c-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--c-grid) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    56px 56px,
+    56px 56px;
+  mask-image: linear-gradient(to bottom, black 0%, black 32%, transparent 78%);
+  opacity: 0.9;
+}
+
+.text-gradient {
+  background-image: linear-gradient(
+    104deg,
+    var(--c-primary-ink) 0%,
+    var(--c-primary) 38%,
+    var(--c-accent) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-lift {
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    border-color 220ms var(--ease-out);
+}
+
+.card-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
+}
+
+.rise-in {
+  animation: rise-in 420ms var(--ease-out) both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes radar-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep {
+  transform-origin: center;
+  animation: radar-sweep 7s linear infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.06);
+  }
+}
+
+.breathe {
+  animation: breathe 5.5s ease-in-out infinite;
+}
+
+/* 侧栏顶部遮罩：不使用模糊（避免下方内容被晕开），改用底色渐变直接遮盖。
+   高度 4rem，其中 0~61% 完全不透明（顶栏 h-14 的 70% 处），
+   从该点开始逐百分点衰减（每 1% 一档，共 39 档），到遮罩底部恰好完全透明，
+   密集断点用于消除色阶断层。 */
+.sidebar-header-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--c-canvas) 0%,
+    var(--c-canvas) 61%,
+    color-mix(in srgb, var(--c-canvas) 97.44%, transparent) 62%,
+    color-mix(in srgb, var(--c-canvas) 94.87%, transparent) 63%,
+    color-mix(in srgb, var(--c-canvas) 92.31%, transparent) 64%,
+    color-mix(in srgb, var(--c-canvas) 89.74%, transparent) 65%,
+    color-mix(in srgb, var(--c-canvas) 87.18%, transparent) 66%,
+    color-mix(in srgb, var(--c-canvas) 84.62%, transparent) 67%,
+    color-mix(in srgb, var(--c-canvas) 82.05%, transparent) 68%,
+    color-mix(in srgb, var(--c-canvas) 79.49%, transparent) 69%,
+    color-mix(in srgb, var(--c-canvas) 76.92%, transparent) 70%,
+    color-mix(in srgb, var(--c-canvas) 74.36%, transparent) 71%,
+    color-mix(in srgb, var(--c-canvas) 71.79%, transparent) 72%,
+    color-mix(in srgb, var(--c-canvas) 69.23%, transparent) 73%,
+    color-mix(in srgb, var(--c-canvas) 66.67%, transparent) 74%,
+    color-mix(in srgb, var(--c-canvas) 64.10%, transparent) 75%,
+    color-mix(in srgb, var(--c-canvas) 61.54%, transparent) 76%,
+    color-mix(in srgb, var(--c-canvas) 58.97%, transparent) 77%,
+    color-mix(in srgb, var(--c-canvas) 56.41%, transparent) 78%,
+    color-mix(in srgb, var(--c-canvas) 53.85%, transparent) 79%,
+    color-mix(in srgb, var(--c-canvas) 51.28%, transparent) 80%,
+    color-mix(in srgb, var(--c-canvas) 48.72%, transparent) 81%,
+    color-mix(in srgb, var(--c-canvas) 46.15%, transparent) 82%,
+    color-mix(in srgb, var(--c-canvas) 43.59%, transparent) 83%,
+    color-mix(in srgb, var(--c-canvas) 41.03%, transparent) 84%,
+    color-mix(in srgb, var(--c-canvas) 38.46%, transparent) 85%,
+    color-mix(in srgb, var(--c-canvas) 35.90%, transparent) 86%,
+    color-mix(in srgb, var(--c-canvas) 33.33%, transparent) 87%,
+    color-mix(in srgb, var(--c-canvas) 30.77%, transparent) 88%,
+    color-mix(in srgb, var(--c-canvas) 28.21%, transparent) 89%,
+    color-mix(in srgb, var(--c-canvas) 25.64%, transparent) 90%,
+    color-mix(in srgb, var(--c-canvas) 23.08%, transparent) 91%,
+    color-mix(in srgb, var(--c-canvas) 20.51%, transparent) 92%,
+    color-mix(in srgb, var(--c-canvas) 17.95%, transparent) 93%,
+    color-mix(in srgb, var(--c-canvas) 15.38%, transparent) 94%,
+    color-mix(in srgb, var(--c-canvas) 12.82%, transparent) 95%,
+    color-mix(in srgb, var(--c-canvas) 10.26%, transparent) 96%,
+    color-mix(in srgb, var(--c-canvas) 7.69%, transparent) 97%,
+    color-mix(in srgb, var(--c-canvas) 5.13%, transparent) 98%,
+    color-mix(in srgb, var(--c-canvas) 2.56%, transparent) 99%,
+    transparent 100%
+  );
+}
+
+/* ---------- 侧栏目录 ---------- */
+.tree-row {
+  transition:
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.tree-active {
+  background: color-mix(in srgb, var(--c-primary) 11%, transparent);
+  color: var(--c-primary-ink);
+}
+
+.tree-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--c-primary);
+}
+
+/* 目录层级切换：进入下一级时旧层向左滑出、新层自右侧滑入；返回时方向相反。
+   新旧节点叠放在同一个 grid 单元格内，避免过渡期间高度塌陷。 */
+.level-forward-enter-active,
+.level-forward-leave-active,
+.level-back-enter-active,
+.level-back-leave-active {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 240ms var(--ease-out);
+}
+
+.level-forward-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+.level-forward-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
+}
+
+.level-back-enter-from {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+
+.level-back-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-forward-enter-active,
+  .level-forward-leave-active,
+  .level-back-enter-active,
+  .level-back-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .level-forward-enter-from,
+  .level-forward-leave-to,
+  .level-back-enter-from,
+  .level-back-leave-to {
+    transform: none;
+  }
+}
+
+/* ---------- 文章排版 ---------- */
+.article-body {
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--c-ink-soft);
+  overflow-wrap: break-word;
+}
+
+.article-body > *:first-child {
+  margin-top: 0;
+}
+
+.article-body h2 {
+  position: relative;
+  margin: 2.9rem 0 1.1rem;
+  padding-left: 0.9rem;
+  font-size: 1.4rem;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--c-ink);
+  scroll-margin-top: 1.5rem;
+}
+
+.article-body h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.32em;
+  bottom: 0.32em;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--c-primary), var(--c-accent));
+}
+
+.article-body h3 {
+  margin: 2rem 0 0.7rem;
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--c-ink);
+  scroll-margin-top: 1.5rem;
+}
+
+.article-body h4 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.article-body p {
+  margin: 0.95rem 0;
+}
+
+.article-body strong {
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+.article-body a {
+  color: var(--c-primary-ink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-primary) 42%, transparent);
+  transition: border-color 160ms var(--ease-out);
+}
+
+.article-body a:hover {
+  border-color: var(--c-primary);
+}
+
+.article-body ul,
+.article-body ol {
+  margin: 0.9rem 0;
+  padding-left: 1.35rem;
+}
+
+.article-body ul {
+  list-style: disc;
+}
+
+.article-body ol {
+  list-style: decimal;
+}
+
+.article-body li {
+  margin: 0.35rem 0;
+  padding-left: 0.15rem;
+}
+
+.article-body li::marker {
+  color: var(--c-primary);
+}
+
+.article-body blockquote {
+  margin: 1.4rem 0;
+  padding: 0.85rem 1.1rem;
+  border-left: 3px solid var(--c-primary);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--c-primary) 7%, transparent);
+  color: var(--c-ink-soft);
+}
+
+.article-body blockquote p {
+  margin: 0.35rem 0;
+}
+
+.article-body hr {
+  margin: 2.5rem 0;
+  border: none;
+  border-top: 1px dashed var(--c-line-strong);
+}
+
+.article-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.14em 0.42em;
+  border-radius: 6px;
+  border: 1px solid var(--c-line);
+  background: var(--c-surface-2);
+  color: var(--c-primary-ink);
+  white-space: nowrap;
+}
+
+.table-scroll {
+  margin: 1.4rem 0;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  overflow-x: auto;
+  background: var(--c-surface);
+}
+
+.article-body table {
+  width: 100%;
+  min-width: max-content;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+}
+
+.article-body thead {
+  background: var(--c-surface-2);
+}
+
+.article-body th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.article-body th,
+.article-body td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--c-line);
+  white-space: nowrap;
+}
+
+.article-body tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.article-body tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--c-surface-2) 55%, transparent);
+}
+
+.article-body img {
+  max-width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--c-line);
+}
+
+.article-body .katex {
+  font-size: 1.03em;
+  color: var(--c-ink);
+}
+
+.article-body .katex-display {
+  margin: 1.2rem 0;
+  padding: 0.7rem 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ---------- 代码块 ---------- */
+.code-block {
+  margin: 1.4rem 0;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  background: var(--c-code-bg);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03);
+}
+
+.code-block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.42rem 0.6rem 0.42rem 0.95rem;
+  background: var(--c-code-bar);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.code-block__lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--c-line);
+  border-radius: 7px;
+  background: var(--c-surface);
+  color: var(--c-ink-faint);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+.code-copy:hover {
+  color: var(--c-primary-ink);
+  border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-line));
+}
+
+.code-copy[data-state='copied'] {
+  color: var(--c-primary-ink);
+  border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-line));
+}
+
+.code-block pre.shiki {
+  margin: 0;
+  padding: 1rem 1.1rem 1.1rem;
+  overflow-x: auto;
+  background-color: var(--c-code-bg) !important;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.75;
+  tab-size: 2;
+}
+
+.code-block pre.shiki code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  color: var(--c-ink-soft);
+  background: transparent;
+}
+
+.code-block pre.shiki span {
+  color: var(--shiki-light, inherit);
+}
+
+.dark .code-block pre.shiki span {
+  color: var(--shiki-dark, inherit);
+}
+
+/* ---------- 行内搜索/TOC 细节 ---------- */
+.toc-link {
+  position: relative;
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+.toc-link[data-active='true'] {
+  color: var(--c-primary-ink);
+  background: color-mix(in srgb, var(--c-primary) 9%, transparent);
+}
+
+.toc-link[data-active='true']::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--c-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

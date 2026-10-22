@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN" class="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="BaguRadar —— 计算机八股文知识库，覆盖计算机基础、语言运行时、后端中间件、前端、分布式、云原生与 AI 工程。"
+    />
+    <meta name="theme-color" content="#FBFBF9" />
+    <meta name="application-name" content="BaguRadar" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>BaguRadar · 计算机八股文知识库</title>
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('baguradar-theme') || 'system'
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var isDark = stored === 'dark' || (stored !== 'light' && prefersDark)
+          if (isDark) document.documentElement.classList.add('dark')
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+        } catch (error) {
+          console.error('[BaguRadar] 初始化主题失败', error)
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
