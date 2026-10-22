@@ -14,6 +14,7 @@ const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const mainRef = ref(null)
 const desktopMedia = window.matchMedia(DESKTOP_QUERY)
+const year = new Date().getFullYear()
 
 // 移动端抽屉接入返回键/返回手势
 useBackClose('sidebar', sidebarOpen)
@@ -91,6 +92,12 @@ onBeforeUnmount(() => {
       :class="sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-[312px]'"
     >
       <RouterView />
+
+      <footer
+        class="mx-auto w-full max-w-[1280px] px-4 pb-[calc(1.5rem+var(--safe-bottom))] pt-10 text-[10.5px] leading-none text-ink-faint sm:px-6"
+      >
+        © {{ year }} BaguRadar
+      </footer>
     </main>
   </div>
 </template>

@@ -185,8 +185,12 @@
 }
 
 @layer base {
-  * {
+  *,
+  *::before,
+  *::after {
     border-color: var(--c-line);
+    /* 触屏端点击高亮：部分内核只认元素级声明，统一关闭避免蓝色覆盖层 */
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
@@ -223,6 +227,11 @@
   :focus-visible {
     outline: 2px solid var(--c-primary);
     outline-offset: 2px;
+  }
+
+  /* 鼠标/触屏点击不保留浏览器默认聚焦描边，键盘导航仍走 :focus-visible */
+  :focus:not(:focus-visible) {
+    outline: none;
   }
 
   html,

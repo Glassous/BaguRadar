@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { ArrowRight, BookOpen, Code2, Radar, Smartphone, Sparkles } from '@lucide/vue'
+import { ArrowRight, Radar, Sparkles } from '@lucide/vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatePanel from '../components/StatePanel.vue'
 import { useCatalog } from '../composables/useCatalog'
@@ -39,10 +39,6 @@ const highlightChips = computed(() => [
   { label: '面试', detail: '场景题 / 项目复盘' },
 ])
 
-const totalLabel = computed(() =>
-  stats.value.updatedAt ? `最近更新 ${stats.value.updatedAt}` : '内容持续同步中',
-)
-
 function scrollToFocus() {
   const focus = route.query.focus
   if (!focus) return
@@ -69,7 +65,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1280px] px-4 pb-[calc(6rem+var(--safe-bottom))] pt-10 sm:px-6 lg:pt-16">
+  <div class="mx-auto w-full max-w-[1280px] px-4 pb-6 pt-10 sm:px-6 lg:pt-16">
     <section class="grid items-center gap-10 lg:grid-cols-[1.12fr_0.88fr]">
       <div class="rise-in">
         <span
@@ -87,8 +83,7 @@ onMounted(async () => {
         </h1>
 
         <p class="mt-5 max-w-[54ch] text-[14px] leading-[1.9] text-ink-soft">
-          从操作系统、网络与算法，到 Java、Go、前端框架，再到分布式、云原生与 AI
-          工程。每一篇都是可独立阅读的知识卡片，按章节树组织，随取随读。
+          把计算机八股文按章节整理成一张随时可查的知识雷达。
         </p>
 
         <div class="mt-7 flex flex-wrap items-center gap-3">
@@ -163,14 +158,9 @@ onMounted(async () => {
     </section>
 
     <section id="knowledge-map" class="mt-16 scroll-mt-8 lg:mt-24">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
-          <h2 class="mt-2 text-[22px] font-semibold tracking-tight text-ink">知识地图</h2>
-        </div>
-        <p class="max-w-[42ch] text-[11.5px] leading-relaxed text-ink-faint">
-          八个章节由浅入深。点击任意卡片进入该章第一篇；左侧目录树可随时跳转到任意小节。
-        </p>
+      <div>
+        <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
+        <h2 class="mt-2 text-[22px] font-semibold tracking-tight text-ink">知识地图</h2>
       </div>
 
       <div v-if="state.loading && !chapters.length" class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -239,34 +229,5 @@ onMounted(async () => {
         </RouterLink>
       </div>
     </section>
-
-    <section class="mt-16 grid gap-3 sm:grid-cols-3">
-      <div class="rounded-2xl border border-line bg-surface/50 p-5">
-        <BookOpen :size="17" class="text-primary" />
-        <p class="mt-3 text-[13px] font-medium text-ink">由浅入深</p>
-        <p class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-          从计算机基础到系统设计，按章与节分层组织，适合系统复习，也适合面试前快速查阅。
-        </p>
-      </div>
-      <div class="rounded-2xl border border-line bg-surface/50 p-5">
-        <Code2 :size="17" class="text-primary" />
-        <p class="mt-3 text-[13px] font-medium text-ink">代码与公式</p>
-        <p class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-          示例代码带语法高亮，数学表达式排版清晰，长文阅读也保持舒适的行距与节奏。
-        </p>
-      </div>
-      <div class="rounded-2xl border border-line bg-surface/50 p-5">
-        <Smartphone :size="17" class="text-primary" />
-        <p class="mt-3 text-[13px] font-medium text-ink">随时随地</p>
-        <p class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-          手机、平板与桌面都能顺畅阅读，支持亮色与深色外观，通勤路上也能翻上两页。
-        </p>
-      </div>
-    </section>
-
-    <footer class="mt-14 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-6 text-[10.5px] text-ink-faint">
-      <p>BaguRadar · {{ site.subtitle || '计算机八股文知识库' }}</p>
-      <p>共收录 {{ stats.docs }} 篇 · 持续更新</p>
-    </footer>
   </div>
 </template>
