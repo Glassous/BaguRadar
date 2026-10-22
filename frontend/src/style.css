@@ -2,6 +2,9 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* 仅在"已安装 PWA + 窗口控件叠加"模式下生效，浏览器标签页里始终为 false */
+@custom-variant wco (@media (display-mode: window-controls-overlay));
+
 @theme inline {
   --font-sans:
     'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI',
@@ -25,6 +28,13 @@
 }
 
 :root {
+  /* 自绘顶栏高度：浏览器内为 0，已安装的应用由 env(titlebar-area-height) 覆盖 */
+  --titlebar-h: 0px;
+  /* 系统栏安全区统一出口：viewport-fit=cover 后由 env() 给出真实值 */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --c-canvas: #fbfbf9;
   --c-canvas-soft: #f3f4f1;
   --c-surface: #ffffff;
@@ -67,6 +77,113 @@
   --shadow-lift: 0 2px 8px rgba(0, 0, 0, 0.6), 0 30px 60px -28px rgba(45, 212, 191, 0.28);
 }
 
+/* ---------- 自绘窗口顶栏（PWA Window Controls Overlay） ----------
+   浏览器标签页里 --titlebar-h 恒为 0：顶栏不显示，整体布局与原来完全一致。
+   已安装并启用叠加模式时，顶栏铺满系统标题栏条带，右侧自动避开最小化/最大化/关闭。 */
+.app-shell {
+  padding-top: var(--titlebar-h);
+}
+
+.app-sidebar {
+  top: var(--titlebar-h);
+}
+
+.app-float-toggle {
+  top: calc(var(--titlebar-h) + 0.75rem);
+}
+
+.app-titlebar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--titlebar-h);
+  z-index: 40;
+  overflow: hidden;
+  /* 与 meta[theme-color] 取同色：系统按钮区由浏览器按主题色绘制，同色才没有接缝 */
+  background: var(--c-canvas);
+  border-bottom: 1px solid var(--c-line);
+  user-select: none;
+  -webkit-user-select: none;
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+.app-titlebar__inner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 100%;
+  min-width: 0;
+  width: env(titlebar-area-width, 100%);
+  margin-left: env(titlebar-area-x, 0px);
+  padding: 0 0.5rem 0 1rem;
+}
+
+.app-titlebar__brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: -0.4rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.45rem;
+  transition: background-color 160ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .app-titlebar__brand:hover {
+    background: var(--c-surface-2);
+  }
+}
+
+.app-titlebar__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.app-titlebar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 0.45rem;
+  color: var(--c-ink-soft);
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .app-titlebar__button:hover {
+    background: var(--c-surface-2);
+    color: var(--c-ink);
+  }
+}
+
+/* 拖动热区内的交互元素必须退出，否则点击会被识别为拖动窗口 */
+.app-titlebar a,
+.app-titlebar button {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+@media (display-mode: window-controls-overlay) {
+  :root {
+    --titlebar-h: env(titlebar-area-height, 0px);
+  }
+
+  .app-titlebar {
+    display: flex;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--c-line);
@@ -75,6 +192,9 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* 触屏端：去掉点击灰块，并禁止下拉刷新与滚动链 */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
 
   body {
@@ -86,6 +206,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+  }
+
+  /* 触屏点击不再等待双击缩放判定 */
+  a,
+  button {
+    touch-action: manipulation;
   }
 
   ::selection {
@@ -111,6 +238,8 @@
 .has-overlay-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* 滚到边界时不把滚动链传给文档，避免触发下拉刷新 */
+  overscroll-behavior: contain;
 }
 
 .app-scroll::-webkit-scrollbar,
@@ -307,10 +436,28 @@
     border-color 220ms var(--ease-out);
 }
 
-.card-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lift);
-  border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
+@media (hover: hover) {
+  .card-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lift);
+    border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
+  }
+}
+
+/* 触屏没有 hover，用按压态代替，避免点完卡片一直"浮着" */
+@media (hover: none) {
+  .card-lift:active {
+    transform: scale(0.994);
+    border-color: color-mix(in srgb, var(--c-primary) 34%, var(--c-line));
+  }
+
+  .tree-row:active {
+    background: var(--c-surface-2);
+  }
+
+  .toc-link:active {
+    background: color-mix(in srgb, var(--c-primary) 8%, transparent);
+  }
 }
 
 .rise-in {
@@ -548,8 +695,10 @@
   transition: border-color 160ms var(--ease-out);
 }
 
-.article-body a:hover {
-  border-color: var(--c-primary);
+@media (hover: hover) {
+  .article-body a:hover {
+    border-color: var(--c-primary);
+  }
 }
 
 .article-body ul,
@@ -709,9 +858,11 @@
     border-color 160ms var(--ease-out);
 }
 
-.code-copy:hover {
-  color: var(--c-primary-ink);
-  border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-line));
+@media (hover: hover) {
+  .code-copy:hover {
+    color: var(--c-primary-ink);
+    border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-line));
+  }
 }
 
 .code-copy[data-state='copied'] {

@@ -30,6 +30,11 @@ function applyTheme(value) {
   const root = document.documentElement
   root.classList.toggle('dark', value === 'dark')
   root.style.colorScheme = value
+
+  // 已安装 PWA 的窗口控件区域由浏览器按主题色绘制，运行时改了深浅色也要同步，
+  // 否则右上角的最小化/最大化/关闭会浮在一条异色底上。
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', value === 'dark' ? '#0b0f14' : '#fbfbf9')
 }
 
 function setMode(next) {
@@ -45,5 +50,5 @@ function setMode(next) {
 watch(resolved, applyTheme, { immediate: true })
 
 export function useTheme() {
-  return { mode, setMode }
+  return { mode, resolved, setMode }
 }

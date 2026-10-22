@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, ChevronLeft, ChevronRight, Clock } from '@lucide/vue'
+import { ArrowRight, ChevronLeft, ChevronRight, Clock, Share2 } from '@lucide/vue'
 import ArticleToc from './ArticleToc.vue'
 
 const props = defineProps({
@@ -21,6 +21,22 @@ const chapterLink = computed(() => ({
 }))
 
 const tags = computed(() => (Array.isArray(props.doc.tags) ? props.doc.tags.filter(Boolean) : []))
+
+// 只有系统提供分享能力时才显示入口（Android / iOS 均为系统分享面板）
+const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+async function shareArticle() {
+  try {
+    await navigator.share({
+      title: props.doc.title,
+      text: props.doc.description || props.doc.title,
+      url: window.location.href,
+    })
+  } catch (error) {
+    // 用户主动取消不属于失败
+    if (error?.name !== 'AbortError') console.error('[BaguRadar] 分享失败', error)
+  }
+}
 
 const readingMinutes = computed(() => {
   const text = String(props.html).replace(/<[^>]+>/g, '')
@@ -74,6 +90,17 @@ onBeforeUnmount(() => {
         <ChevronRight :size="11" />
         <span class="text-ink-soft">{{ doc.section.title }}</span>
       </template>
+
+      <button
+        v-if="canShare"
+        type="button"
+        class="ml-auto inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-line bg-surface/60 px-2.5 text-[11px] text-ink-faint transition-colors hover:border-primary/40 hover:text-primary-ink"
+        aria-label="分享本文"
+        @click="shareArticle"
+      >
+        <Share2 :size="12" />
+        分享
+      </button>
     </div>
 
     <header class="mt-4">

@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center px-4 py-8"
+      class="fixed inset-0 z-50 flex items-center justify-center pl-[calc(1rem+var(--safe-left))] pr-[calc(1rem+var(--safe-right))] pt-8 pb-[calc(2rem+var(--safe-bottom))]"
       :class="{ 'pointer-events-none': !open }"
       :aria-hidden="!open"
     >
@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
           aria-modal="true"
           aria-labelledby="settings-title"
           tabindex="-1"
-          class="dialog-card relative max-h-[calc(100dvh-4rem)] w-full max-w-[360px] overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl outline-none"
+          class="dialog-card relative max-h-[calc(100dvh-4rem-var(--safe-bottom))] w-full max-w-[360px] overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl outline-none"
         >
           <div class="flex items-center gap-3 border-b border-line px-5 py-4">
             <span

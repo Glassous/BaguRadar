@@ -1,7 +1,9 @@
 <script setup>
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
+import AppTitlebar from './components/AppTitlebar.vue'
+import { useBackClose } from './composables/useBackClose'
 import { useCatalog } from './composables/useCatalog'
 
 const DESKTOP_QUERY = '(min-width: 1024px)'
@@ -11,9 +13,18 @@ const { ensureCatalog } = useCatalog()
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const mainRef = ref(null)
+const desktopMedia = window.matchMedia(DESKTOP_QUERY)
+
+// 移动端抽屉接入返回键/返回手势
+useBackClose('sidebar', sidebarOpen)
 
 function isDesktop() {
-  return window.matchMedia(DESKTOP_QUERY).matches
+  return desktopMedia.matches
+}
+
+function handleDesktopChange(event) {
+  // 进入桌面断点后抽屉不再是浮层，顺手清掉它的历史记录
+  if (event.matches) sidebarOpen.value = false
 }
 
 function toggleSidebar() {
@@ -36,18 +47,24 @@ watch(
 )
 
 onMounted(() => {
+  desktopMedia.addEventListener('change', handleDesktopChange)
   ensureCatalog()
+})
+
+onBeforeUnmount(() => {
+  desktopMedia.removeEventListener('change', handleDesktopChange)
 })
 </script>
 
 <template>
-  <div class="h-dvh overflow-hidden bg-canvas text-ink">
+  <div class="app-shell h-dvh overflow-hidden bg-canvas text-ink">
+    <AppTitlebar />
     <div class="page-atmosphere" aria-hidden="true" />
 
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="fixed left-3 top-3 z-30 inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color] duration-300 ease-out hover:border-primary/45 hover:shadow-lg"
+      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-10 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color] duration-300 ease-out hover:border-primary/45 hover:shadow-lg"
       :class="sidebarCollapsed ? '' : 'lg:left-[324px]'"
       aria-label="切换侧栏"
       aria-controls="app-sidebar"
@@ -70,7 +87,7 @@ onMounted(() => {
     <main
       ref="mainRef"
       v-scrollbar
-      class="app-scroll h-full overflow-y-auto pt-14 transition-[margin-left] duration-300 ease-out lg:pt-0"
+      class="app-scroll h-full overflow-y-auto pt-14 pl-[var(--safe-left)] pr-[var(--safe-right)] transition-[margin-left] duration-300 ease-out lg:pt-0"
       :class="sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-[312px]'"
     >
       <RouterView />

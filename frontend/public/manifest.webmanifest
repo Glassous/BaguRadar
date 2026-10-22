@@ -7,9 +7,27 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "launch_handler": { "client_mode": "navigate-existing" },
   "background_color": "#FBFBF9",
   "theme_color": "#FBFBF9",
   "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "首页",
+      "short_name": "首页",
+      "description": "回到 BaguRadar 首页",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "知识地图",
+      "short_name": "知识地图",
+      "description": "直接查看全部章节",
+      "url": "/#/?focus=map",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -40,6 +58,22 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-narrow.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "首页与知识地图"
+    },
+    {
+      "src": "/screenshots/doc-wide.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "文章阅读与目录"
     }
   ]
 }

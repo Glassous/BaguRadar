@@ -2,7 +2,10 @@
 <html lang="zh-CN" class="">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta
       name="description"
       content="BaguRadar —— 计算机八股文知识库，覆盖计算机基础、语言运行时、后端中间件、前端、分布式、云原生与 AI 工程。"
@@ -21,6 +24,9 @@
           var isDark = stored === 'dark' || (stored !== 'light' && prefersDark)
           if (isDark) document.documentElement.classList.add('dark')
           document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
+          // 同步窗口主题色：已安装 PWA 的标题栏控件区按该色绘制，必须与顶栏底色一致
+          var themeMeta = document.querySelector('meta[name="theme-color"]')
+          if (themeMeta) themeMeta.setAttribute('content', isDark ? '#0b0f14' : '#fbfbf9')
         } catch (error) {
           console.error('[BaguRadar] 初始化主题失败', error)
         }

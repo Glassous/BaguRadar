@@ -46,9 +46,14 @@ const totalLabel = computed(() =>
 function scrollToFocus() {
   const focus = route.query.focus
   if (!focus) return
-  const element = document.getElementById(`chapter-${focus}`)
+  // focus=map 供桌面快捷方式直接落到知识地图
+  const isMap = focus === 'map'
+  const element = document.getElementById(isMap ? 'knowledge-map' : `chapter-${focus}`)
   if (!element) return
-  window.setTimeout(() => element.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120)
+  window.setTimeout(
+    () => element.scrollIntoView({ behavior: 'smooth', block: isMap ? 'start' : 'center' }),
+    120,
+  )
 }
 
 function scrollToMap() {
@@ -64,7 +69,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-[1280px] px-4 pb-24 pt-10 sm:px-6 lg:pt-16">
+  <div class="mx-auto w-full max-w-[1280px] px-4 pb-[calc(6rem+var(--safe-bottom))] pt-10 sm:px-6 lg:pt-16">
     <section class="grid items-center gap-10 lg:grid-cols-[1.12fr_0.88fr]">
       <div class="rise-in">
         <span

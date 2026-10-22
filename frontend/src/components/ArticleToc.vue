@@ -104,7 +104,7 @@ function goTo(id) {
 
     <nav
       v-scrollbar
-      class="scroll-area mt-3 max-h-[calc(100vh-12rem)] overflow-y-auto border-l border-line pb-4"
+      class="scroll-area mt-3 max-h-[calc(100dvh-12rem)] overflow-y-auto border-l border-line pb-4"
     >
       <button
         v-for="item in toc"

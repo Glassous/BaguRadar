@@ -93,7 +93,7 @@ watch(() => route.fullPath, load, { immediate: true })
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1240px] gap-10 px-4 pb-24 pt-8 sm:px-6 lg:pt-14 xl:px-8">
+  <div class="mx-auto flex w-full max-w-[1240px] gap-10 px-4 pb-[calc(6rem+var(--safe-bottom))] pt-8 sm:px-6 lg:pt-14 xl:px-8">
     <div class="min-w-0 flex-1">
       <div v-if="loading" class="mx-auto w-full max-w-[860px]">
         <StatePanel variant="loading" :lines="12" />

@@ -6,6 +6,7 @@ import BrandMark from './BrandMark.vue'
 import SettingsDialog from './SettingsDialog.vue'
 import TreeNode from './TreeNode.vue'
 import StatePanel from './StatePanel.vue'
+import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useCatalog } from '../composables/useCatalog'
 import { useInstallApp } from '../composables/useInstallApp'
 
@@ -30,6 +31,9 @@ const pathStack = ref([])
 const scrollRef = ref(null)
 const settingsOpen = ref(false)
 const savedIds = readSavedPath()
+
+// 设置弹窗同样接入系统返回键
+useBackClose('settings', settingsOpen)
 
 const { installed, promptInstall } = useInstallApp()
 const installHint = ref('')
@@ -143,7 +147,10 @@ function goToDepth(count) {
 }
 
 function handleNavClick(event) {
-  if (event.target.closest?.('a')) emit('close')
+  if (!event.target.closest?.('a')) return
+  // 导航触发的关闭不参与历史回退，避免和路由的 push 抢历史栈
+  dismissOverlay('sidebar')
+  emit('close')
 }
 
 let restored = false
@@ -193,11 +200,12 @@ ensureCatalog()
     </Transition>
 
     <aside
-      class="fixed inset-y-0 left-0 z-40 flex w-[90%] max-w-[360px] flex-col border-r border-line bg-canvas/95 backdrop-blur-xl transition-transform duration-300 ease-out lg:w-[312px] lg:bg-canvas/60"
+      class="app-sidebar fixed bottom-0 left-0 z-40 flex w-[90%] max-w-[360px] flex-col border-r border-line bg-canvas/95 pl-[var(--safe-left)] backdrop-blur-xl transition-transform duration-300 ease-out lg:w-[312px] lg:bg-canvas/60"
       :class="asideClass"
       :inert="props.collapsed && !props.open"
     >
-      <div class="absolute inset-x-0 top-0 z-10 flex h-14 items-center gap-2 px-4">
+      <!-- 已安装应用的顶栏已承载品牌信息，侧栏内不再重复 -->
+      <div class="absolute right-0 left-[var(--safe-left)] top-0 z-10 flex h-14 items-center gap-2 px-4 wco:hidden">
         <div class="sidebar-header-mask" aria-hidden="true" />
         <RouterLink
           to="/"
@@ -228,7 +236,7 @@ ensureCatalog()
       <div
         ref="scrollRef"
         v-scrollbar
-        class="scroll-area flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2.5 pb-20 pt-14"
+        class="scroll-area flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2.5 pb-[calc(5rem+var(--safe-bottom))] pt-14 wco:pt-3"
       >
         <div class="grid h-10 items-center px-2">
           <Transition :name="levelTransition">
@@ -338,13 +346,13 @@ ensureCatalog()
         <p
           v-if="installHint"
           role="status"
-          class="pointer-events-none absolute inset-x-[18px] bottom-[60px] z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-center text-[11px] leading-relaxed text-ink-faint shadow-soft backdrop-blur"
+          class="pointer-events-none absolute right-[18px] bottom-[60px] left-[calc(18px+var(--safe-left))] z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-center text-[11px] leading-relaxed text-ink-faint shadow-soft backdrop-blur"
         >
           {{ installHint }}
         </p>
       </Transition>
 
-      <div class="absolute bottom-4 left-[18px] z-10 flex items-center gap-2">
+      <div class="absolute bottom-[calc(1rem+var(--safe-bottom))] left-[calc(18px+var(--safe-left))] z-10 flex items-center gap-2">
         <button
           type="button"
           class="inline-flex h-9 w-[104px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-soft shadow-soft transition-all duration-200 hover:border-primary/45 hover:text-primary-ink hover:shadow-lg"
