@@ -1,9 +1,9 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import { Flip } from 'gsap/Flip'
-import { ArrowRight, Bookmark, Radar, Sparkles, X } from '@lucide/vue'
+import { ArrowRight, Bookmark, LayoutGrid, Radar, Sparkles, X } from '@lucide/vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatePanel from '../components/StatePanel.vue'
 import { useCatalog } from '../composables/useCatalog'
@@ -14,6 +14,32 @@ gsap.registerPlugin(Flip)
 const OPEN_PROPS = 'fontSize,borderRadius,color,backgroundColor'
 const CLOSE_PROPS = 'fontSize,borderRadius,color'
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// 3D 知识雷达按需加载：three 体积较大，只在真正需要时拉取
+const KnowledgeRadar = defineAsyncComponent(
+  () => import('../components/knowledge-radar/KnowledgeRadar.vue'),
+)
+
+const DESKTOP_QUERY = '(min-width: 1024px)'
+const supports3d = ref(false)
+
+function detect3d() {
+  if (typeof window === 'undefined') return false
+  if (!window.matchMedia(DESKTOP_QUERY).matches) return false
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+    return Boolean(gl)
+  } catch (error) {
+    console.error('[BaguRadar] WebGL 能力探测失败', error)
+    return false
+  }
+}
+
+const viewMode = ref('3d')
+const forceList = ref(false)
+const radarRef = ref(null)
+const radarError = ref('')
 
 const route = useRoute()
 const { state, site, stats, chapters, ensureCatalog, getDocByRoute } = useCatalog()
@@ -89,6 +115,18 @@ let lastCardEl = null
 let activeFlip = null
 let closing = false
 
+// 3D 目标的屏幕投影锚点：点击 3D 目标时在这里种一张“虚拟卡片”，
+// 复用与列表卡片完全一致的 Flip 展开动画。
+const flipAnchor = ref(null)
+const anchorRef = ref(null)
+const fromRadar = ref(false)
+
+const anchorStyle = computed(() => {
+  const anchor = flipAnchor.value
+  if (!anchor) return {}
+  return { left: `${anchor.x}px`, top: `${anchor.y}px` }
+})
+
 const activeChapterIndex = computed(() => {
   if (!activeChapter.value) return 0
   return chapters.value.findIndex((chapter) => chapter.id === activeChapter.value.id) + 1
@@ -105,10 +143,10 @@ const activeSections = computed(() => {
   })
 })
 
-async function openChapter(chapter, event) {
+async function openChapter(chapter, source) {
   if (activeChapter.value) return
 
-  const cardEl = event.currentTarget
+  const cardEl = source instanceof Element ? source : source?.currentTarget
   const titleEl = cardEl?.querySelector('[data-flip-part="title"]')
   const descEl = cardEl?.querySelector('[data-flip-part="desc"]')
   if (!cardEl || !titleEl || !descEl) return
@@ -164,7 +202,10 @@ function closeChapter() {
   const panel = panelRef.value
   const panelTitle = panelTitleRef.value
   const panelDesc = panelDescRef.value
-  const cardEl = document.querySelector(`[data-chapter-card="${chapter.id}"]`)
+  const cardEl =
+    lastCardEl && lastCardEl.isConnected
+      ? lastCardEl
+      : document.querySelector(`[data-chapter-card="${chapter.id}"]`)
 
   // 打断展开动画：先停在当前位置，再从这里反向回位，避免两段 FLIP 同时写同一批属性
   if (activeFlip) {
@@ -201,7 +242,14 @@ function closeChapter() {
       activeChapter.value = null
       nextTick(() => {
         gsap.set(overlayRef.value, { autoAlpha: 0 })
-        lastCardEl?.focus({ preventScroll: true })
+        if (fromRadar.value) {
+          fromRadar.value = false
+          flipAnchor.value = null
+          lastCardEl = null
+          radarRef.value?.clearRadarSelection?.()
+        } else {
+          lastCardEl?.focus({ preventScroll: true })
+        }
       })
     },
   })
@@ -259,7 +307,68 @@ function scrollToMap() {
   document.getElementById('knowledge-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function switchView(mode) {
+  if (mode === viewMode.value) return
+  if (mode === '3d' && forceList.value) return
+  viewMode.value = mode
+  if (mode === 'list' && !activeChapter.value) {
+    flipAnchor.value = null
+    fromRadar.value = false
+  }
+}
+
+async function openChapterFromRadar(id) {
+  if (activeChapter.value) return
+  const chapter = chapters.value.find((item) => item.id === id)
+  if (!chapter) return
+
+  const point = radarRef.value?.projectChapter(id)
+  if (!point || !point.visible) {
+    openChapterFromRadarFallback(chapter)
+    return
+  }
+
+  const width = 268
+  const height = 124
+  flipAnchor.value = {
+    x: Math.round(point.x - width / 2),
+    y: Math.round(point.y - height * 0.66),
+    chapter,
+  }
+  fromRadar.value = true
+  await nextTick()
+  if (!anchorRef.value) return
+  openChapter(chapter, anchorRef.value)
+}
+
+// 目标被地形/相机遮挡时，退化到面板中心展开
+async function openChapterFromRadarFallback(chapter) {
+  const shell = document.querySelector('.kr-shell')
+  const rect = shell?.getBoundingClientRect()
+  flipAnchor.value = {
+    x: Math.round((rect?.left || 0) + (rect?.width || 640) / 2 - 134),
+    y: Math.round((rect?.top || 0) + (rect?.height || 480) / 2 - 80),
+    chapter,
+  }
+  fromRadar.value = true
+  await nextTick()
+  if (!anchorRef.value) return
+  openChapter(chapter, anchorRef.value)
+}
+
+function handleRadarSelect(id) {
+  openChapterFromRadar(id)
+}
+
+function handleRadarUnsupported(message) {
+  radarError.value = message || 'WebGL 不可用'
+  forceList.value = true
+  viewMode.value = 'list'
+}
+
 onMounted(async () => {
+  supports3d.value = detect3d()
+  viewMode.value = supports3d.value ? '3d' : 'list'
   document.title = `${site.value.title} · ${site.value.subtitle}`
   // 详情层常驻挂载但初始不可见，保证打开时首帧就已处在 Flip 的起始位置
   gsap.set([overlayRef.value, scrimRef.value], { autoAlpha: 0 })
@@ -377,9 +486,47 @@ onBeforeUnmount(() => {
     </section>
 
     <section id="knowledge-map" class="mt-16 scroll-mt-8 lg:mt-24">
-      <div>
-        <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
-        <h2 class="mt-2 text-[22px] font-semibold tracking-tight text-ink">知识地图</h2>
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
+          <h2 class="mt-2 text-[22px] font-semibold tracking-tight text-ink">知识地图</h2>
+          <p v-if="viewMode === '3d'" class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+            16 个章节已布防地形 · 4 类雷达持续扫描 · 点击标签卡片或右上角区域卡片进入
+          </p>
+          <p v-else-if="radarError" class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+            3D 雷达不可用（{{ radarError }}），已切换到列表视图
+          </p>
+        </div>
+
+        <div
+          v-if="supports3d && !forceList"
+          class="inline-flex items-center gap-1 rounded-xl border border-line bg-surface-2/60 p-1"
+          role="tablist"
+          aria-label="知识地图视图切换"
+        >
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="viewMode === '3d'"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium transition-colors"
+            :class="viewMode === '3d' ? 'bg-surface text-ink shadow-soft' : 'text-ink-faint hover:text-ink'"
+            @click="switchView('3d')"
+          >
+            <Radar :size="12" />
+            雷达视图
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="viewMode === 'list'"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium transition-colors"
+            :class="viewMode === 'list' ? 'bg-surface text-ink shadow-soft' : 'text-ink-faint hover:text-ink'"
+            @click="switchView('list')"
+          >
+            <LayoutGrid :size="12" />
+            列表视图
+          </button>
+        </div>
       </div>
 
       <div v-if="state.loading && !chapters.length" class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -400,9 +547,18 @@ onBeforeUnmount(() => {
         @retry="ensureCatalog(true)"
       />
 
-      <div v-else class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <button
-          v-for="(chapter, index) in chapters"
+      <div v-else class="mt-6">
+        <KnowledgeRadar
+          v-if="viewMode === '3d'"
+          ref="radarRef"
+          :chapters="chapters"
+          @select="handleRadarSelect"
+          @unsupported="handleRadarUnsupported"
+        />
+
+        <div v-else class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <button
+            v-for="(chapter, index) in chapters"
           :id="`chapter-${chapter.id}`"
           :key="chapter.id"
           type="button"
@@ -458,11 +614,36 @@ onBeforeUnmount(() => {
               <ArrowRight :size="12" class="transition-transform duration-200 group-hover:translate-x-0.5" />
             </span>
           </div>
-        </button>
+          </button>
+        </div>
       </div>
     </section>
 
     <Teleport to="body">
+      <!-- 3D 目标投影锚点：Flip 从这里把“锁定卡片”展开成章节弹窗 -->
+      <div
+        v-if="flipAnchor"
+        ref="anchorRef"
+        :style="anchorStyle"
+        :class="activeChapter ? 'invisible' : ''"
+        class="pointer-events-none fixed z-40 w-[268px] overflow-hidden rounded-2xl border border-primary/40 bg-[#04100f] p-4 shadow-2xl"
+        aria-hidden="true"
+      >
+        <div class="flex items-center justify-between font-mono text-[9px] tracking-[0.16em] text-[#5eead4]/70">
+          <span>RADAR LOCK · CH.{{ String(flipAnchor.chapter.id).slice(0, 2) }}</span>
+          <span>{{ flipAnchor.chapter.docCount }} 篇</span>
+        </div>
+        <h3 data-flip-part="title" class="mt-2 text-[16px] font-semibold leading-tight text-[#d8fff7]">
+          {{ flipAnchor.chapter.title }}
+        </h3>
+        <p
+          data-flip-part="desc"
+          class="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[#8fd8cf]/80"
+        >
+          {{ flipAnchor.chapter.description }}
+        </p>
+      </div>
+
       <div
         ref="overlayRef"
         class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 sm:px-6"

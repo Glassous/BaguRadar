@@ -1,0 +1,641 @@
+/* ==========================================================================
+   3D 知识雷达 · 赛博朋克战术指挥中心 HUD
+   该文件为全局样式：CSS2DRenderer 生成的标签是运行时插入 DOM 的。
+   ========================================================================== */
+
+.kr-shell {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(13, 148, 136, 0.16), transparent 62%),
+    #030d10;
+  color: #bff5ea;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  box-shadow:
+    0 0 0 1px rgba(4, 30, 28, 0.9) inset,
+    0 30px 70px -40px rgba(20, 184, 166, 0.55);
+  isolation: isolate;
+}
+
+.kr-canvas-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.kr-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: default;
+}
+
+.kr-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ---------- 目标标签 ---------- */
+.radar-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 86px;
+  padding: 4px 7px 4px 7px;
+  border-left: 2px solid var(--zone-color, #5eead4);
+  border-radius: 2px 7px 7px 2px;
+  background: linear-gradient(100deg, rgba(4, 25, 24, 0.92), rgba(4, 25, 24, 0.55));
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.18),
+    0 6px 22px -12px rgba(0, 0, 0, 0.9);
+  color: rgba(200, 245, 236, 0.75);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 1;
+  transition:
+    opacity 220ms ease,
+    transform 200ms ease,
+    background 240ms ease,
+    box-shadow 240ms ease,
+    color 240ms ease,
+    border-color 240ms ease;
+  transform-origin: center bottom;
+  backdrop-filter: blur(3px);
+}
+
+/* 未扫描：常驻暗态 */
+.radar-label[data-state='idle'] {
+  opacity: 0.62;
+  border-left-color: rgba(148, 233, 218, 0.4);
+  background: linear-gradient(100deg, rgba(4, 22, 22, 0.76), rgba(4, 22, 22, 0.34));
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.1);
+}
+
+.radar-label[data-state='idle'] .radar-label__zone {
+  opacity: 0.45;
+}
+
+.radar-label[data-state='idle'] .radar-label__title {
+  font-weight: 500;
+  color: rgba(216, 255, 247, 0.72);
+}
+
+/* 被雷达扫到：点亮区域色 */
+.radar-label[data-state='locked'] {
+  opacity: 1;
+  color: #effffb;
+  border-left-color: var(--zone-color, #5eead4);
+  background: linear-gradient(100deg, rgba(6, 33, 31, 0.96), rgba(6, 33, 31, 0.6));
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.3),
+    0 0 20px -8px var(--zone-color, #5eead4),
+    0 8px 24px -14px rgba(0, 0, 0, 0.9);
+}
+
+.radar-label[data-state='locked'] .radar-label__zone {
+  opacity: 1;
+}
+
+.radar-label[data-state='locked'] .radar-label__meta {
+  color: rgba(190, 250, 240, 0.82);
+}
+
+/* 盲区：未知信号占位 */
+.radar-label[data-state='masked'] {
+  opacity: 0.85;
+  border-left: 2px dashed rgba(248, 113, 113, 0.7);
+  background: linear-gradient(100deg, rgba(38, 10, 12, 0.82), rgba(24, 8, 10, 0.4));
+  color: #ffd7d7;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.18);
+}
+
+.radar-label[data-state='masked'] .radar-label__zone {
+  color: #fca5a5;
+}
+
+.radar-label[data-state='masked'] .radar-label__meta {
+  color: rgba(252, 165, 165, 0.7);
+}
+
+/* 区域运镜：非当前区域标签弱化，但依旧常驻可见 */
+.radar-label.is-dim {
+  opacity: 0.32;
+  filter: saturate(0.55);
+}
+
+.radar-label::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  bottom: calc(-9px - var(--leader, 0px));
+  width: 1px;
+  height: calc(9px + var(--leader, 0px));
+  background: linear-gradient(to top, transparent, var(--zone-color, #5eead4));
+  opacity: 0.55;
+}
+
+/* 标签被下移时，引线翻到上方指向锚点 */
+.radar-label.is-below::after {
+  bottom: auto;
+  top: calc(-9px - var(--leader, 0px));
+  background: linear-gradient(to bottom, transparent, var(--zone-color, #5eead4));
+}
+
+.radar-label__zone {
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  color: var(--zone-color, #5eead4);
+  opacity: 0.85;
+}
+
+.radar-label__title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.radar-label__meta {
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  color: rgba(148, 233, 218, 0.6);
+}
+
+.radar-label.is-hover,
+.radar-label.is-active {
+  z-index: 4;
+  opacity: 1;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 212, 0.6),
+    0 0 26px -4px var(--zone-color, #5eead4);
+}
+
+/* ---------- HUD 叠加层 ---------- */
+.kr-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(167, 243, 231, 0.72);
+}
+
+.kr-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(94, 234, 212, 0.045) 0px,
+    rgba(94, 234, 212, 0.045) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
+.kr-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(105% 80% at 50% 46%, transparent 52%, rgba(2, 10, 12, 0.72) 100%);
+}
+
+/* HUD 必须压在 CSS2D 标签之上（标签的 z-index 由 CSS2DRenderer 动态写入 1..16） */
+.kr-hud {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.kr-hud--tl {
+  top: 14px;
+  left: 16px;
+}
+
+.kr-hud--tr {
+  top: 12px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.kr-hud--bl {
+  bottom: 14px;
+  left: 16px;
+  max-width: min(300px, 42%);
+}
+
+.kr-hud--br {
+  bottom: 12px;
+  right: 14px;
+}
+
+.kr-hud--bc {
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.kr-title {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: #7ef2d9;
+}
+
+.kr-subtitle {
+  margin-top: 3px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: rgba(126, 242, 217, 0.42);
+}
+
+.kr-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 9px;
+  color: rgba(126, 242, 217, 0.6);
+}
+
+.kr-stats strong {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #5eead4;
+  text-shadow: 0 0 14px rgba(45, 212, 191, 0.6);
+}
+
+/* 右上角区域卡片：点击直接运镜到该区域 */
+.kr-zones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  width: 248px;
+  pointer-events: auto;
+}
+
+.kr-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 7px 5px 8px;
+  border: 1px solid rgba(148, 233, 218, 0.12);
+  border-left: 2px solid var(--zone-color, #5eead4);
+  border-radius: 2px 6px 6px 2px;
+  background: rgba(4, 22, 22, 0.92);
+  color: rgba(196, 246, 238, 0.82);
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.kr-zone:hover,
+.kr-zone:focus-visible {
+  background: rgba(8, 42, 40, 0.92);
+  box-shadow: 0 0 18px -6px var(--zone-color, #5eead4);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.kr-zone:last-child {
+  grid-column: 1 / -1;
+}
+
+.kr-zone[data-active='true'] {
+  background: rgba(9, 46, 44, 0.94);
+  border-color: rgba(148, 233, 218, 0.42);
+  border-left-color: var(--zone-color, #5eead4);
+  box-shadow:
+    inset 0 0 0 1px rgba(94, 234, 212, 0.12),
+    0 0 20px -8px var(--zone-color, #5eead4);
+}
+
+.kr-zone__en {
+  font-size: 7.5px;
+  letter-spacing: 0.16em;
+  color: var(--zone-color, #5eead4);
+  opacity: 0.8;
+}
+
+.kr-zone__cn {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+}
+
+.kr-zone__cn em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+}
+
+.kr-tools {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.kr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  border-radius: 3px;
+  background: rgba(4, 26, 26, 0.8);
+  color: rgba(196, 246, 238, 0.85);
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.kr-btn:hover {
+  border-color: rgba(94, 234, 212, 0.7);
+  color: #d8fff7;
+  background: rgba(9, 46, 44, 0.9);
+}
+
+.kr-btn[data-state='done'] {
+  border-color: rgba(94, 234, 212, 0.16);
+  color: rgba(126, 242, 217, 0.4);
+  cursor: default;
+}
+
+/* ---------- 事件日志 ---------- */
+.kr-log {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(94, 234, 212, 0.22);
+}
+
+.kr-log__entry {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  line-height: 1.5;
+  color: rgba(196, 246, 238, 0.62);
+  animation: kr-log-in 260ms ease both;
+}
+
+.kr-log__entry time {
+  color: rgba(94, 234, 212, 0.45);
+}
+
+.kr-log__entry.is-lock {
+  color: #9ffbe6;
+}
+
+.kr-log__entry.is-noise {
+  color: #ff9a9a;
+}
+
+.kr-log__entry.is-alert {
+  color: #ffd27a;
+}
+
+@keyframes kr-log-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 2D 雷达显示屏 ---------- */
+.kr-scope {
+  position: relative;
+  padding: 8px;
+  border: 1px solid rgba(94, 234, 212, 0.26);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(13, 148, 136, 0.18), rgba(3, 16, 18, 1) 68%),
+    #031012;
+  box-shadow:
+    0 0 0 1px rgba(2, 12, 12, 0.9) inset,
+    0 0 26px -12px rgba(45, 212, 191, 0.7);
+  pointer-events: auto;
+}
+
+.kr-scope svg {
+  display: block;
+  width: 148px;
+  height: 148px;
+  overflow: visible;
+}
+
+.kr-scope__caption {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: rgba(126, 242, 217, 0.5);
+}
+
+.kr-scope__blip {
+  cursor: pointer;
+  transition: r 120ms ease;
+}
+
+.kr-scope__blip:hover circle {
+  r: 4.2;
+}
+
+.kr-scope__hint {
+  margin-top: 4px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: rgba(126, 242, 217, 0.4);
+  text-align: right;
+}
+
+/* ---------- 顶部扫描光带 ---------- */
+.kr-scanbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.75), transparent);
+  animation: kr-scanbar 5.5s linear infinite;
+}
+
+@keyframes kr-scanbar {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(640px);
+    opacity: 0;
+  }
+}
+
+/* ---------- 四角准星 ---------- */
+.kr-corners span {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  pointer-events: none;
+}
+
+.kr-corners span:nth-child(1) {
+  top: 8px;
+  left: 8px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.kr-corners span:nth-child(2) {
+  top: 8px;
+  right: 8px;
+  border-left: 0;
+  border-bottom: 0;
+}
+.kr-corners span:nth-child(3) {
+  bottom: 8px;
+  left: 8px;
+  border-right: 0;
+  border-top: 0;
+}
+.kr-corners span:nth-child(4) {
+  bottom: 8px;
+  right: 8px;
+  border-left: 0;
+  border-top: 0;
+}
+
+/* ---------- 杂波警告 ---------- */
+.kr-alert {
+  position: absolute;
+  left: 50%;
+  bottom: 23%;
+  z-index: 22;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 3px;
+  background: rgba(46, 8, 8, 0.82);
+  color: #ffb4b4;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  pointer-events: none;
+  animation: kr-alert 1.5s ease forwards;
+}
+
+.kr-alert.is-alert {
+  border-color: rgba(94, 234, 212, 0.6);
+  background: rgba(5, 34, 32, 0.9);
+  color: #a7f3e7;
+}
+
+@keyframes kr-alert {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  14%,
+  74% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+.kr-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #030d10;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: rgba(126, 242, 217, 0.7);
+}
+
+.kr-boot__bar {
+  width: 90px;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(94, 234, 212, 0.15);
+}
+
+.kr-boot__bar::after {
+  content: '';
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: #5eead4;
+  animation: kr-boot 1.1s ease-in-out infinite;
+}
+
+@keyframes kr-boot {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@media (max-width: 1279px) {
+  .kr-hud--bl {
+    display: none;
+  }
+  .kr-scope svg {
+    width: 112px;
+    height: 112px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kr-scanbar,
+  .kr-log__entry,
+  .kr-alert,
+  .kr-boot__bar::after {
+    animation: none;
+  }
+}
