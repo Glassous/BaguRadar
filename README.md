@@ -11,6 +11,7 @@
 
 ```
 BaguRadar/
+├── .github/workflows/        # CI：构建并部署前端
 ├── README.md                 # 本文档
 └── frontend/                 # 前端工程
     ├── plugins/bucket-static.js   # dev/preview 阶段把 /bucket 映射到本地桶目录
@@ -121,6 +122,75 @@ VITE_BUCKET_BASE_URL=/bucket
 3. 重新构建前端并部署 `dist/` 即可，代码无需改动。
 
 > 若前端与桶同域部署，也可以把桶内文件放到站点根路径，并将 `VITE_BUCKET_BASE_URL` 设为 `/`。
+
+## 部署
+
+前端是纯静态产物，只需要发布 `frontend/dist/`。仓库内置 GitHub Actions 工作流，自动构建并同步到 1Panel 站点目录：
+
+| 项 | 值 |
+| --- | --- |
+| 工作流 | `.github/workflows/deploy-frontend.yml` |
+| 触发条件 | push 到 `main` 且改动 `frontend/**`，或手动 `Run workflow` |
+| 构建环境 | Node 22 → `npm ci` → `npm run build` |
+| 部署方式 | SSH + `rsync --delete-after` |
+| 目标目录 | `ubuntu@<服务器地址>:/opt/1panel/www/sites/baguradar/index/dist` |
+
+> `--delete-after` 会删除目标目录中不属于构建产物的文件，该目录只放 `dist/` 内容，不要存放其他数据。
+
+### 1. 配置仓库变量
+
+在 GitHub 仓库 `Settings → Secrets and variables → Actions` 中按名称添加：
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `DEPLOY_HOST` | Secret | 服务器地址，IP 或域名 |
+| `DEPLOY_USER` | Secret | SSH 用户，如 `ubuntu` |
+| `DEPLOY_SSH_KEY` | Secret | 该用户的私钥全文，含 `BEGIN` / `END` 行 |
+| `DEPLOY_PORT` | Variable（可选） | SSH 端口，默认 `22` |
+| `DEPLOY_PATH` | Variable（可选） | 部署目录，默认 `/opt/1panel/www/sites/baguradar/index/dist` |
+| `VITE_BUCKET_BASE_URL` | Variable（可选） | 构建时注入的桶地址，留空使用代码默认值 |
+| `DEPLOY_KNOWN_HOSTS` | Secret（可选） | 预置 `known_hosts`，不配置则用 `ssh-keyscan` 获取 |
+
+缺少必填 Secret 时，工作流会在「校验部署变量」步骤直接失败并提示名称。
+
+生成部署密钥对（本地执行，不要提交私钥）：
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-baguradar" -f ~/.ssh/baguradar_deploy -N ""
+ssh-copy-id -i ~/.ssh/baguradar_deploy.pub ubuntu@<服务器地址>
+```
+
+`~/.ssh/baguradar_deploy` 的完整内容填入 `DEPLOY_SSH_KEY`。
+
+### 2. 准备服务器目录
+
+用部署账户登录服务器，创建目录并授予写权限（文件保持 `755/644`，保证 1Panel 的 nginx 可读）：
+
+```bash
+sudo mkdir -p /opt/1panel/www/sites/baguradar/index/dist
+sudo chown -R ubuntu:ubuntu /opt/1panel/www/sites/baguradar/index/dist
+sudo find /opt/1panel/www/sites/baguradar/index/dist -type d -exec chmod 755 {} \;
+sudo find /opt/1panel/www/sites/baguradar/index/dist -type f -exec chmod 644 {} \;
+```
+
+若仍提示 `Permission denied`，补充父目录的穿越权限：
+
+```bash
+sudo chmod o+x /opt/1panel/www/sites/baguradar /opt/1panel/www/sites/baguradar/index
+```
+
+服务器需安装 `rsync`（多数 Ubuntu 已预装），否则执行 `sudo apt-get install -y rsync`。1Panel 站点根目录需指向该 `dist` 目录。
+
+### 3. 手动部署（可选）
+
+不走 CI 时可在本地直接推送构建产物：
+
+```bash
+cd BaguRadar/frontend
+npm ci
+npm run build
+rsync -rlptz --delete-after --chmod=D755,F644 dist/ ubuntu@<服务器地址>:/opt/1panel/www/sites/baguradar/index/dist/
+```
 
 ## 设计说明
 
