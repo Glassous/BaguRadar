@@ -65,14 +65,14 @@ onBeforeUnmount(() => {
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-10 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color] duration-300 ease-out hover:border-primary/45 hover:shadow-lg"
+      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color] duration-300 ease-out hover:border-primary/45 hover:shadow-lg lg:size-10"
       :class="sidebarCollapsed ? '' : 'lg:left-[324px]'"
       aria-label="切换侧栏"
       aria-controls="app-sidebar"
       :aria-expanded="!sidebarCollapsed"
       @click="toggleSidebar"
     >
-      <span class="flex w-4 flex-col items-start gap-[5px]">
+      <span class="flex w-[18px] flex-col items-start gap-[5px] lg:w-4">
         <span class="block h-[1.5px] w-full rounded-full bg-ink-soft" />
         <span class="block h-[1.5px] w-[58%] rounded-full bg-ink-soft" />
       </span>

@@ -16,6 +16,7 @@
   --color-canvas-soft: var(--c-canvas-soft);
   --color-surface: var(--c-surface);
   --color-surface-2: var(--c-surface-2);
+  --color-card: var(--c-card);
   --color-ink: var(--c-ink);
   --color-ink-soft: var(--c-ink-soft);
   --color-ink-faint: var(--c-ink-faint);
@@ -39,6 +40,8 @@
   --c-canvas-soft: #f3f4f1;
   --c-surface: #ffffff;
   --c-surface-2: #f6f7f4;
+  /* 知识地图卡片底色：写成 rgba 便于 GSAP 直接插值 */
+  --c-card: rgba(255, 255, 255, 0.65);
   --c-ink: #111827;
   --c-ink-soft: #4b5563;
   --c-ink-faint: #8a8f98;
@@ -61,6 +64,7 @@
   --c-canvas-soft: #0e141b;
   --c-surface: #111820;
   --c-surface-2: #161e27;
+  --c-card: rgba(17, 24, 32, 0.65);
   --c-ink: #e6e9ee;
   --c-ink-soft: #b3bcc7;
   --c-ink-faint: #8b95a3;
