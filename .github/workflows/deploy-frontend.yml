@@ -49,8 +49,15 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # 构建全程在 GitHub 托管的 runner 上完成，服务器不参与构建
       - name: 构建
         run: npm run build
+
+      - name: 校验构建产物
+        run: |
+          test -f dist/index.html
+          test -d dist/assets
+          echo "产物大小：$(du -sh dist | cut -f1)，文件数：$(find dist -type f | wc -l)"
 
       - name: 校验部署变量
         run: |
@@ -87,6 +94,7 @@ jobs:
           ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
 
+      # 只上传 runner 上已构建好的静态文件，不在服务器安装依赖或执行构建
       - name: 同步构建产物
         run: |
           rsync -rlptz --delete-after --chmod=D755,F644 \

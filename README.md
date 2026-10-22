@@ -125,7 +125,7 @@ VITE_BUCKET_BASE_URL=/bucket
 
 ## 部署
 
-前端是纯静态产物，只需要发布 `frontend/dist/`。仓库内置 GitHub Actions 工作流，自动构建并同步到 1Panel 站点目录：
+前端是纯静态产物，只需要发布 `frontend/dist/`。构建在 GitHub 托管的 runner 上完成，服务器只接收构建结果，不安装依赖、不执行构建：
 
 | 项 | 值 |
 | --- | --- |
