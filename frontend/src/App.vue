@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { Share2 } from '@lucide/vue'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTitlebar from './components/AppTitlebar.vue'
 import { useBackClose } from './composables/useBackClose'
@@ -38,6 +39,45 @@ function toggleSidebar() {
   sidebarOpen.value = true
 }
 
+// 分享入口常驻右上角：点击后只复制当前页面链接
+const shareHint = ref('')
+let shareHintTimer = 0
+
+function showShareHint(message) {
+  shareHint.value = message
+  window.clearTimeout(shareHintTimer)
+  shareHintTimer = window.setTimeout(() => {
+    shareHint.value = ''
+  }, 2000)
+}
+
+// 非安全上下文（无 Clipboard API）时的兜底复制
+function legacyCopy(text) {
+  const area = document.createElement('textarea')
+  area.value = text
+  area.setAttribute('readonly', '')
+  area.style.position = 'fixed'
+  area.style.opacity = '0'
+  document.body.appendChild(area)
+  area.select()
+  const copied = document.execCommand('copy')
+  area.remove()
+  if (!copied) throw new Error('execCommand copy failed')
+}
+
+async function copyPageLink() {
+  const url = window.location.href
+
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url)
+    else legacyCopy(url)
+    showShareHint('链接已复制')
+  } catch (error) {
+    console.error('[BaguRadar] 复制链接失败', error)
+    showShareHint('复制失败')
+  }
+}
+
 watch(
   () => route.fullPath,
   async () => {
@@ -54,6 +94,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   desktopMedia.removeEventListener('change', handleDesktopChange)
+  window.clearTimeout(shareHintTimer)
 })
 </script>
 
@@ -77,6 +118,32 @@ onBeforeUnmount(() => {
         <span class="block h-[1.5px] w-[58%] rounded-full bg-ink-soft" />
       </span>
     </button>
+
+    <button
+      v-show="!sidebarOpen"
+      type="button"
+      class="app-float-action fixed right-[calc(0.75rem+var(--safe-right))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-soft transition-[box-shadow,border-color,color] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-10"
+      aria-label="复制本页链接"
+      title="复制本页链接"
+      @click="copyPageLink"
+    >
+      <Share2 :size="16" />
+    </button>
+
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="translate-y-1 opacity-0"
+      leave-active-class="transition duration-150 ease-in"
+      leave-to-class="translate-y-1 opacity-0"
+    >
+      <p
+        v-if="shareHint"
+        role="status"
+        class="app-float-hint pointer-events-none fixed right-[calc(0.75rem+var(--safe-right))] z-30 rounded-full border border-line bg-surface/95 px-3 py-1 text-[11px] leading-none text-ink-faint shadow-soft backdrop-blur"
+      >
+        {{ shareHint }}
+      </p>
+    </Transition>
 
     <AppSidebar
       id="app-sidebar"

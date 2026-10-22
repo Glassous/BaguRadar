@@ -92,8 +92,14 @@
   top: var(--titlebar-h);
 }
 
-.app-float-toggle {
+.app-float-toggle,
+.app-float-action {
   top: calc(var(--titlebar-h) + 0.75rem);
+}
+
+/* 右上角分享按钮下方的轻量反馈（如“链接已复制”） */
+.app-float-hint {
+  top: calc(var(--titlebar-h) + 4.25rem);
 }
 
 .app-titlebar {
