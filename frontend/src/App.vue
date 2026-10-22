@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Share2 } from '@lucide/vue'
 import AppSidebar from './components/AppSidebar.vue'
@@ -16,6 +16,9 @@ const sidebarCollapsed = ref(false)
 const mainRef = ref(null)
 const desktopMedia = window.matchMedia(DESKTOP_QUERY)
 const year = new Date().getFullYear()
+
+// 正文滚动发生在这个容器上，供阅读进度记录复用
+provide('appScrollEl', mainRef)
 
 // 移动端抽屉接入返回键/返回手势
 useBackClose('sidebar', sidebarOpen)

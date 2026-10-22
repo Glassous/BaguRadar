@@ -3,10 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { RouterLink, useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import { Flip } from 'gsap/Flip'
-import { ArrowRight, Radar, Sparkles, X } from '@lucide/vue'
+import { ArrowRight, Bookmark, Radar, Sparkles, X } from '@lucide/vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatePanel from '../components/StatePanel.vue'
 import { useCatalog } from '../composables/useCatalog'
+import { useReadingPosition } from '../composables/useReadingPosition'
 
 gsap.registerPlugin(Flip)
 
@@ -15,7 +16,8 @@ const CLOSE_PROPS = 'fontSize,borderRadius,color'
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const route = useRoute()
-const { state, site, stats, chapters, ensureCatalog } = useCatalog()
+const { state, site, stats, chapters, ensureCatalog, getDocByRoute } = useCatalog()
+const { lastPosition, clearReadingPosition } = useReadingPosition()
 
 const shown = reactive({ chapters: 0, sections: 0, docs: 0 })
 
@@ -42,6 +44,31 @@ watch(
 
 const totalLabel = computed(() =>
   stats.value.updatedAt ? `最近更新 ${stats.value.updatedAt}` : '内容持续同步中',
+)
+
+// 上次阅读记录：文章仍在目录里才算有效，否则回落成“开始阅读”
+const resumeTarget = computed(() => {
+  const saved = lastPosition.value
+  if (!saved) return null
+  // 依赖目录数据，目录加载完成后重新校验
+  if (!state.docs.length) return null
+  const doc = getDocByRoute(saved.route)
+  if (!doc) return null
+  return { route: doc.route, title: doc.title || saved.title }
+})
+
+const startLink = computed(() => {
+  if (resumeTarget.value) return `/doc/${resumeTarget.value.route}?resume=1`
+  return chapters.value.length ? `/doc/${chapters.value[0].firstRoute}` : ''
+})
+
+watch(
+  () => state.loaded,
+  (loaded) => {
+    if (!loaded || !lastPosition.value) return
+    if (!getDocByRoute(lastPosition.value.route)) clearReadingPosition()
+  },
+  { immediate: true },
 )
 
 const highlightChips = computed(() => [
@@ -274,11 +301,12 @@ onBeforeUnmount(() => {
 
         <div class="mt-7 flex flex-wrap items-center gap-3">
           <RouterLink
-            v-if="chapters.length"
-            :to="`/doc/${chapters[0].firstRoute}`"
+            v-if="startLink"
+            :to="startLink"
+            :title="resumeTarget ? `上次读到《${resumeTarget.title}》` : undefined"
             class="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-medium text-white shadow-soft transition-all duration-200 hover:bg-primary-ink hover:shadow-lg"
           >
-            开始阅读
+            {{ resumeTarget ? '继续上次位置' : '开始阅读' }}
             <ArrowRight :size="15" class="transition-transform duration-200 group-hover:translate-x-0.5" />
           </RouterLink>
           <button
@@ -290,6 +318,11 @@ onBeforeUnmount(() => {
             浏览知识地图
           </button>
         </div>
+
+        <p v-if="resumeTarget" class="mt-2.5 flex items-center gap-1.5 text-[10.5px] text-ink-faint">
+          <Bookmark :size="11" class="shrink-0 text-primary/70" />
+          <span class="truncate">上次读到《{{ resumeTarget.title }}》</span>
+        </p>
 
         <dl class="mt-10 flex items-end gap-7 border-t border-line pt-6">
           <div>
