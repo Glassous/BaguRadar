@@ -86,9 +86,9 @@ export class RadarStage {
       powerPreference: 'high-performance',
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.9))
-    this.renderer.setClearColor(0x030b0e, 1)
+    this.renderer.setClearColor(0x0a2f3a, 1)
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.24
+    this.renderer.toneMappingExposure = 1.12
 
     this.labelRenderer = new CSS2DRenderer({ element: this.labelLayer })
     this.labelRenderer.domElement.style.position = 'absolute'
@@ -98,27 +98,30 @@ export class RadarStage {
 
   setupScene() {
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x030b0e)
-    this.scene.fog = new THREE.FogExp2(0x061f1c, 0.0033)
+    // 海雾色与远处海面、天空地平线统一，远景淡出到海雾而不是露出黑色虚空
+    const horizonColor = new THREE.Color(0x0a2f3a)
+    this.scene.background = horizonColor.clone()
+    this.scene.fog = new THREE.FogExp2(horizonColor.clone(), 0.0022)
+    this.scene.add(this.createSkyDome(horizonColor))
 
     // 所有世界内容统一缩放，便于整体“把地图做大”而不改动任何坐标公式
     this.world = new THREE.Group()
     this.world.scale.setScalar(WORLD_SCALE)
     this.scene.add(this.world)
 
-    const hemi = new THREE.HemisphereLight(0x53f2d5, 0x04120f, 0.62)
+    const hemi = new THREE.HemisphereLight(0x53f2d5, 0x04120f, 0.46)
     this.scene.add(hemi)
 
-    const key = new THREE.DirectionalLight(0x9af8e4, 1.65)
+    const key = new THREE.DirectionalLight(0x9af8e4, 1.2)
     key.position.set(64, 92, 46)
     this.scene.add(key)
 
-    const rim = new THREE.DirectionalLight(0x2b6bff, 0.5)
+    const rim = new THREE.DirectionalLight(0x2b6bff, 0.42)
     rim.position.set(-70, 48, -60)
     this.scene.add(rim)
 
     // 面向默认机位的补光，避免目标在雾中变成纯黑剪影
-    const fill = new THREE.DirectionalLight(0x9fe8ff, 0.65)
+    const fill = new THREE.DirectionalLight(0x9fe8ff, 0.5)
     fill.position.set(70, 45, 110)
     this.scene.add(fill)
 
@@ -131,22 +134,76 @@ export class RadarStage {
     this.world.add(seaLight)
   }
 
+  /** 渐变天穹：地平线色与雾一致，向上渐隐到深空，避免大片纯黑背景 */
+  createSkyDome(horizonColor) {
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(1150, 40, 24),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          uTop: { value: new THREE.Color(0x01080d) },
+          uHorizon: { value: horizonColor.clone() },
+          uGlow: { value: new THREE.Color(0x10525e) },
+        },
+        vertexShader: `
+          varying vec3 vDir;
+          void main() {
+            vDir = normalize(position);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uTop;
+          uniform vec3 uHorizon;
+          uniform vec3 uGlow;
+          varying vec3 vDir;
+          void main() {
+            float t = smoothstep(-0.03, 0.52, vDir.y);
+            vec3 color = mix(uHorizon, uTop, t);
+            float band = pow(1.0 - clamp(abs(vDir.y) * 3.2, 0.0, 1.0), 3.0);
+            color += uGlow * band * 0.4;
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `,
+      }),
+    )
+    dome.name = 'sky-dome'
+    dome.renderOrder = -1
+    dome.frustumCulled = false
+    return dome
+  }
+
   setupCamera() {
     const width = this.canvas.clientWidth || 900
     const height = this.canvas.clientHeight || 600
 
-    this.camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 620)
+    // far 需覆盖天穹与远海平面，否则地平线会被裁出一道黑边
+    this.camera = new THREE.PerspectiveCamera(42, width / height, 0.5, 1600)
     this.camera.position.copy(HOME_POSITION)
 
     this.controls = new OrbitControls(this.camera, this.canvas)
     this.controls.target.copy(HOME_TARGET)
-    // 移除所有手动操作，只保留程序化运镜（区域切换 / 光点联动 / 重置）
-    this.controls.enableRotate = false
-    this.controls.enableZoom = false
-    this.controls.enablePan = false
-    this.controls.enableDamping = false
+    // 开放自由视角：左键拖拽旋转 / 滚轮缩放 / 右键拖拽平移
+    this.controls.enableRotate = true
+    this.controls.enableZoom = true
+    this.controls.enablePan = true
+    this.controls.enableDamping = true
+    this.controls.dampingFactor = 0.075
     this.controls.autoRotate = false
+    this.controls.rotateSpeed = 0.55
+    this.controls.zoomSpeed = 0.85
+    this.controls.panSpeed = 0.7
+    this.controls.screenSpacePanning = false
+    this.controls.minDistance = 38
+    this.controls.maxDistance = 340
+    // 平移范围收敛在岛体附近，避免把相机拖到天穹之外
+    this.controls.maxTargetRadius = 132
+    this.controls.minPolarAngle = 0.06
+    // 略小于 90°，避免镜头钻到海平面以下
+    this.controls.maxPolarAngle = Math.PI * 0.492
     this.controls.update()
+    this.canvas.style.cursor = 'grab'
 
     this.raycaster = new THREE.Raycaster()
     this.raycaster.params.Points.threshold = 2
@@ -319,13 +376,28 @@ export class RadarStage {
         const prev = this.hoverId
         this.hoverId = null
         this.refreshLabelById(prev)
-        this.canvas.style.cursor = 'default'
         this.callbacks.onHover?.(null)
       }
+      if (!this.pointerDown) this.canvas.style.cursor = 'grab'
     }
 
-    // 无拖拽 / 无缩放，只有点击目标
-    this.onClick = (event) => {
+    // 拖拽旋转 / 平移时不再改变光标与 hover，松开后按位移阈值判定是否为点击
+    this.onPointerDown = (event) => {
+      this.pointerDown = { x: event.clientX, y: event.clientY, button: event.button }
+      this.cancelCameraTween()
+      if (event.button === 0) this.canvas.style.cursor = 'grabbing'
+    }
+
+    this.onPointerUp = (event) => {
+      const down = this.pointerDown
+      this.pointerDown = null
+      this.canvas.style.cursor = this.hoverId ? 'pointer' : 'grab'
+      if (!down || down.button !== 0 || event.button !== 0) return
+
+      // 拖拽超过阈值视为旋转视角，不触发选中 / 取消选中
+      const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y)
+      if (moved > 6) return
+
       const hit = this.pick(event)
       if (hit?.target) this.select(hit.target.id)
       else if (hit?.noise) this.handleNoise(hit.noise)
@@ -334,7 +406,8 @@ export class RadarStage {
 
     this.canvas.addEventListener('pointermove', this.onPointerMove)
     this.canvas.addEventListener('pointerleave', this.onPointerLeave)
-    this.canvas.addEventListener('click', this.onClick)
+    this.canvas.addEventListener('pointerdown', this.onPointerDown)
+    window.addEventListener('pointerup', this.onPointerUp)
   }
 
   refreshLabelById(id) {
@@ -374,7 +447,7 @@ export class RadarStage {
   }
 
   updateHover() {
-    if (!this.pointerInside || this.disposed) return
+    if (!this.pointerInside || this.disposed || this.pointerDown) return
     this.raycaster.setFromCamera(this.pointer, this.camera)
 
     const roots = this.targetSystem.targets.map((target) => target.model)
@@ -391,7 +464,7 @@ export class RadarStage {
       this.hoverId = nextId
       if (prev) this.refreshLabelById(prev)
       if (nextId) this.refreshLabelById(nextId)
-      this.canvas.style.cursor = nextId ? 'pointer' : 'default'
+      this.canvas.style.cursor = nextId ? 'pointer' : 'grab'
       const target = this.targetSystem.targets.find((item) => item.id === nextId)
       this.callbacks.onHover?.(target || null)
     }
@@ -450,24 +523,37 @@ export class RadarStage {
 
   moveCamera(dest, lookAt, duration = this.reduceMotion ? 0.2 : 1.15) {
     this.stopAutoRotate()
+    this.cancelCameraTween()
+
+    // 运镜期间关闭阻尼：先让 update() 清空残余惯性，避免与自由视角互相抢相机
+    this.controls.enableDamping = false
+    this.controls.update()
+
+    this.cameraTween = gsap
+      .timeline({
+        onUpdate: () => this.controls.update(),
+        onComplete: () => this.finishCameraTween(),
+      })
+      .to(this.camera.position, { x: dest.x, y: dest.y, z: dest.z, duration, ease: 'power3.inOut' }, 0)
+      .to(this.controls.target, { x: lookAt.x, y: lookAt.y, z: lookAt.z, duration, ease: 'power3.inOut' }, 0)
+  }
+
+  /** 用户开始拖拽 / 新的运镜请求时，立即中断进行中的相机补间 */
+  cancelCameraTween() {
     gsap.killTweensOf(this.camera.position)
     gsap.killTweensOf(this.controls.target)
+    if (this.cameraTween) {
+      this.cameraTween.kill()
+      this.cameraTween = null
+    }
+    if (this.controls) this.controls.enableDamping = true
+  }
 
-    gsap.to(this.camera.position, {
-      x: dest.x,
-      y: dest.y,
-      z: dest.z,
-      duration,
-      ease: 'power3.inOut',
-    })
-    gsap.to(this.controls.target, {
-      x: lookAt.x,
-      y: lookAt.y,
-      z: lookAt.z,
-      duration,
-      ease: 'power3.inOut',
-      onUpdate: () => this.controls.update(),
-    })
+  finishCameraTween() {
+    this.cameraTween = null
+    if (!this.controls) return
+    this.controls.enableDamping = true
+    this.controls.update()
   }
 
   /** 区域聚焦：把相机推到该区域所有目标的包围中心 */
@@ -690,10 +776,10 @@ export class RadarStage {
 
     this.canvas.removeEventListener('pointermove', this.onPointerMove)
     this.canvas.removeEventListener('pointerleave', this.onPointerLeave)
-    this.canvas.removeEventListener('click', this.onClick)
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+    window.removeEventListener('pointerup', this.onPointerUp)
 
-    gsap.killTweensOf(this.camera.position)
-    gsap.killTweensOf(this.controls.target)
+    this.cancelCameraTween()
     this.controls.dispose()
 
     this.radarSystem.dispose()

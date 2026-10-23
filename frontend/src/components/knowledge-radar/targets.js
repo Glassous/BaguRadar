@@ -2,13 +2,13 @@ import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { buildChapterModel, buildNoiseTarget } from './models'
 import { NOISE_TARGETS } from './chapterConfig'
-import { terrainHeight, SEA_LEVEL } from './terrain'
+import { terrainSurfaceHeight, SEA_LEVEL } from './terrain'
 
-const LOCK_COLOR = 0x5eead4
+const LOCK_COLOR = new THREE.Color(0x5eead4)
 
-function createLockRing(color) {
+function createLockRing(color, radius = 1.6) {
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(1.5, 1.72, 32),
+    new THREE.RingGeometry(radius, radius * 1.14, 40),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -70,10 +70,12 @@ export function createTargets(resolved) {
   const targets = []
 
   for (const [index, config] of resolved.entries()) {
+    // 落在体素柱顶面（向上取整后的高度），保证载具贴合地形而不是悬空；
+    // 峡谷章节位于海平面以下的谷底，不能钳到 SEA_LEVEL，否则会浮在空中
     const baseY =
-      config.zone === 'sky'
+      config.zone === 'sky' || config.zone === 'sea'
         ? SEA_LEVEL + config.lift
-        : Math.max(terrainHeight(config.x, config.z), SEA_LEVEL) + config.lift
+        : terrainSurfaceHeight(config.x, config.z) + config.lift
 
     const holder = new THREE.Group()
     holder.position.set(config.x, baseY, config.z)
@@ -83,18 +85,24 @@ export function createTargets(resolved) {
     model.scale.setScalar(config.scale)
     holder.add(model)
 
-    const lockRing = createLockRing(config.accent)
-    lockRing.scale.setScalar(1.6 * config.scale)
+    // 依据体素载体的实际尺寸布置锁定环、悬浮标记与标签锚点
+    const bounds = new THREE.Box3().setFromObject(model)
+    const size = bounds.getSize(new THREE.Vector3())
+    const modelHeight = bounds.max.y
+    const footprint = Math.max(size.x, size.z)
+
+    const lockRing = createLockRing(config.accent, Math.max(1.5, footprint * 0.52))
+    lockRing.scale.setScalar(1.6)
     holder.add(lockRing)
 
     const marker = createMarker(config.accent)
-    marker.position.y = 5.4 * config.scale
+    marker.position.y = modelHeight + 1.3
     marker.visible = false
     holder.add(marker)
 
     const labelAnchor = new THREE.Object3D()
     // 错开标签高度，减少主峰区多个标签在屏幕上互相压叠
-    labelAnchor.position.y = 7.2 * config.scale + (index % 4) * 3.2
+    labelAnchor.position.y = modelHeight + 3 + (index % 4) * 2.6
     holder.add(labelAnchor)
 
     const materials = collectMaterials(model)
@@ -109,6 +117,7 @@ export function createTargets(resolved) {
       model,
       materials,
       marker,
+      markerBaseY: marker.position.y,
       lockRing,
       labelAnchor,
       locked: false,
@@ -140,11 +149,7 @@ export function createTargets(resolved) {
   const noise = []
   for (const [noiseIndex, config] of NOISE_TARGETS.entries()) {
     const holder = new THREE.Group()
-    holder.position.set(
-      config.x,
-      Math.max(terrainHeight(config.x, config.z), SEA_LEVEL) + 0.4,
-      config.z,
-    )
+    holder.position.set(config.x, terrainSurfaceHeight(config.x, config.z) + 0.4, config.z)
     const mesh = buildNoiseTarget(0xef4444)
     mesh.scale.setScalar(config.scale)
     mesh.userData.noiseIndex = noiseIndex
@@ -199,14 +204,12 @@ export function createTargets(resolved) {
             ease: 'power2.out',
           },
         )
+        // 直接补间 Color 分量，避免把 material.emissive 覆写成数字
+        const baseEmissive = new THREE.Color(material.userData.baseEmissive ?? 0x000000)
         gsap.fromTo(
-          material,
-          { emissive: LOCK_COLOR },
-          {
-            emissive: material.userData.baseEmissive ?? 0x000000,
-            duration: 1.1,
-            ease: 'power2.out',
-          },
+          material.emissive,
+          { r: LOCK_COLOR.r, g: LOCK_COLOR.g, b: LOCK_COLOR.b },
+          { r: baseEmissive.r, g: baseEmissive.g, b: baseEmissive.b, duration: 1.1, ease: 'power2.out' },
         )
       }
     }
@@ -259,7 +262,7 @@ export function createTargets(resolved) {
     for (const target of targets) {
       if (target.marker.visible) {
         target.marker.rotation.y = elapsed * 1.4
-        target.marker.position.y = 5.4 * target.config.scale + Math.sin(elapsed * 2 + target.config.x) * 0.16
+        target.marker.position.y = target.markerBaseY + Math.sin(elapsed * 2 + target.config.x) * 0.16
       }
     }
     for (const target of targets) {
@@ -274,8 +277,17 @@ export function createTargets(resolved) {
   }
 
   function dispose() {
-    for (const target of targets) target.pulseTween?.kill()
-    for (const item of noise) item.pulseTween?.kill()
+    for (const target of targets) {
+      target.pulseTween?.kill()
+      for (const material of target.materials) {
+        gsap.killTweensOf(material)
+        gsap.killTweensOf(material.emissive)
+      }
+    }
+    for (const item of noise) {
+      item.pulseTween?.kill()
+      for (const material of item.materials) gsap.killTweensOf(material)
+    }
     gsap.killTweensOf(group.children)
     group.traverse((object) => {
       if (object.geometry) object.geometry.dispose()

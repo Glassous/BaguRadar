@@ -263,7 +263,7 @@ defineExpose({
     <div class="kr-hud kr-hud--bc">
       <p class="flex items-center gap-1.5 text-[9px] text-[rgba(126,242,217,0.5)]">
         <Crosshair :size="10" />
-        点击区域卡片切换运镜 · 点击标签卡片查看章节
+        左键拖拽旋转 · 滚轮缩放 · 右键平移 · 点击标签查看章节
       </p>
     </div>
 
