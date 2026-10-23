@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight, ChevronLeft, ChevronRight, Clock } from '@lucide/vue'
 import ArticleToc from './ArticleToc.vue'
+import { useTheme } from '../composables/useTheme'
+import { renderDiagrams } from '../utils/mermaid'
 
 const props = defineProps({
   doc: { type: Object, required: true },
@@ -12,8 +14,11 @@ const props = defineProps({
   next: { type: Object, default: null },
 })
 
+const { resolved: themeMode } = useTheme()
+
 const bodyRef = ref(null)
 const copyTimers = new WeakMap()
+let diagramToken = 0
 
 const chapterLink = computed(() => ({
   path: '/',
@@ -23,20 +28,32 @@ const chapterLink = computed(() => ({
 const tags = computed(() => (Array.isArray(props.doc.tags) ? props.doc.tags.filter(Boolean) : []))
 
 // 正文字数（去掉标签与空白字符），阅读时长按每分钟 420 字估算
+// 图表块的 mermaid 源码不算正文，先整段剔除
 const charCount = computed(() =>
   String(props.html)
+    .replace(/<pre[^>]*data-diagram-source[^>]*>[\s\S]*?<\/pre>/g, '')
     .replace(/<[^>]+>/g, '')
     .replace(/\s/g, '').length,
 )
 
 const readingMinutes = computed(() => Math.max(1, Math.round(charCount.value / 420)))
 
+// 代码块复制高亮后的源码，图表块复制 mermaid 源码（画成 SVG 后 <pre> 是隐藏的）
+function blockSource(block) {
+  if (!block) return ''
+  const diagramSource = block.querySelector('[data-diagram-source]')
+  if (diagramSource) return diagramSource.textContent || ''
+  return block.querySelector('pre')?.innerText || ''
+}
+
 function handleClick(event) {
   const button = event.target.closest?.('[data-copy]')
   if (!button) return
-  const block = button.closest('.code-block')
-  const code = block?.querySelector('pre')?.innerText || ''
+  const code = blockSource(button.closest('.code-block, .diagram-block'))
   if (!code) return
+
+  const label = button.dataset.label || button.textContent
+  button.dataset.label = label
 
   navigator.clipboard
     .writeText(code)
@@ -49,7 +66,7 @@ function handleClick(event) {
         button,
         window.setTimeout(() => {
           button.dataset.state = ''
-          button.textContent = '复制'
+          button.textContent = label
         }, 1600),
       )
     })
@@ -58,11 +75,36 @@ function handleClick(event) {
     })
 }
 
+// 图表渲染是异步的（首次还要下载 mermaid），token 用于丢弃切文章/切主题后过期的结果
+async function renderDiagramsNow() {
+  const token = ++diagramToken
+  await nextTick()
+  if (!bodyRef.value) return
+  await renderDiagrams(bodyRef.value, {
+    theme: themeMode.value,
+    isCancelled: () => token !== diagramToken,
+  })
+}
+
 onMounted(() => {
   bodyRef.value?.addEventListener('click', handleClick)
+  void renderDiagramsNow()
 })
 
+// 深浅色主题下 mermaid 需要按新配色重绘
+watch(themeMode, () => {
+  void renderDiagramsNow()
+})
+
+watch(
+  () => props.html,
+  () => {
+    void renderDiagramsNow()
+  },
+)
+
 onBeforeUnmount(() => {
+  diagramToken += 1
   bodyRef.value?.removeEventListener('click', handleClick)
 })
 </script>

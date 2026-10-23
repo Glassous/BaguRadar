@@ -916,6 +916,122 @@
   color: var(--shiki-dark, inherit);
 }
 
+/* ---------- Mermaid 图表 ---------- */
+.diagram-block {
+  margin: 1.4rem 0;
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  background: var(--c-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03);
+}
+
+.diagram-block__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.42rem 0.6rem 0.42rem 0.95rem;
+  background: var(--c-surface-2);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.diagram-block__lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+
+.diagram-block__copy {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--c-line);
+  border-radius: 7px;
+  background: var(--c-surface);
+  color: var(--c-ink-faint);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .diagram-block__copy:hover {
+    color: var(--c-primary-ink);
+    border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-line));
+  }
+}
+
+.diagram-block__copy[data-state='copied'] {
+  color: var(--c-primary-ink);
+  border-color: color-mix(in srgb, var(--c-primary) 55%, var(--c-line));
+}
+
+.diagram-block__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.1rem 1rem;
+  overflow-x: auto;
+}
+
+/* 渲染前后高度变化会让阅读位置漂移，先留出占位高度 */
+.diagram-block[data-diagram-state='pending'] .diagram-block__canvas {
+  min-height: 108px;
+}
+
+.diagram-block__canvas svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.diagram-block__hint {
+  font-size: 12px;
+  color: var(--c-ink-faint);
+}
+
+.diagram-block__hint--error {
+  color: var(--c-accent);
+}
+
+/* 源码默认隐藏，渲染失败时展开，保证内容不至于丢失 */
+.diagram-block__source {
+  display: none;
+  margin: 0;
+  padding: 0.9rem 1rem 1rem;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-code-bg);
+  color: var(--c-ink-soft);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  tab-size: 2;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.diagram-block.is-error .diagram-block__source {
+  display: block;
+}
+
+.diagram-block.is-error .diagram-block__canvas {
+  padding-bottom: 0.6rem;
+}
+
+/* mermaid 渲染时会把 tooltip 容器挂到 body 末尾，它默认是 absolute 且没有偏移量，
+   会落在文档流末尾把根文档撑高，导致最外层多出一条页面滚动条。
+   改成 fixed 后既不影响悬浮提示的定位（hover 时 mermaid 会写 top/left），
+   又不会参与滚动区域计算。 */
+body > .mermaidTooltip {
+  position: fixed !important;
+  z-index: 60;
+  pointer-events: none;
+}
+
 /* ---------- 行内搜索/TOC 细节 ---------- */
 .toc-link {
   position: relative;

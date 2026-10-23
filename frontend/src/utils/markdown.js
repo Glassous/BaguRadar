@@ -160,11 +160,33 @@ if (katexPlugin) {
 
 const defaultFence = md.renderer.rules.fence
 
+// 图表类代码块：这里只输出占位 DOM，由 utils/mermaid 在浏览器里画成 SVG。
+// 源码留在 <pre> 里，既保证“复制源码”可用，渲染失败时也能直接降级展示。
+const DIAGRAM_LANGS = new Set(['mermaid', 'mmd'])
+
+function renderDiagramBlock(code, label) {
+  return `<figure class="diagram-block" data-diagram>
+  <div class="diagram-block__bar">
+    <span class="diagram-block__lang">${escapeHtml(label)}</span>
+    <button type="button" class="diagram-block__copy" data-copy>复制源码</button>
+  </div>
+  <div class="diagram-block__canvas" data-diagram-canvas>
+    <span class="diagram-block__hint">图表渲染中…</span>
+  </div>
+  <pre class="diagram-block__source" data-diagram-source>${escapeHtml(code.replace(/\n$/, ''))}</pre>
+</figure>
+`
+}
+
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const rawLang = (token.info || '').trim().split(/\s+/)[0] || 'text'
   const normalized = rawLang.toLowerCase()
   const lang = LANG_ALIASES[normalized] || normalized
+
+  if (DIAGRAM_LANGS.has(normalized)) {
+    return renderDiagramBlock(token.content, rawLang)
+  }
 
   const highlighted = highlight(token.content, lang)
   const codeHtml =
