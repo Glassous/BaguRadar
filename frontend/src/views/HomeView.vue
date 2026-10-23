@@ -107,6 +107,26 @@ watch(
   { immediate: true },
 )
 
+// 知识地图下方的外部站点入口：图标取自远程图床，加载失败时自动退回首字色块
+const ICON_BASE = 'https://publicfiles.glassous.top/%E5%9B%BE%E6%A0%87'
+const externalLinks = [
+  {
+    name: '值班室',
+    href: 'https://bagu.imicola.com/',
+    icon: `${ICON_BASE}/%E5%80%BC%E7%8F%AD%E5%AE%A4.png`,
+  },
+  {
+    name: '卡码笔记',
+    href: 'https://notes.kamacoder.com/',
+    icon: `${ICON_BASE}/%E5%8D%A1%E7%A0%81%E7%AC%94%E8%AE%B0.jpg`,
+  },
+  {
+    name: '小林coding',
+    href: 'https://www.xiaolincoding.com/',
+    icon: `${ICON_BASE}/%E5%B0%8F%E6%9E%97coding.webp`,
+  },
+]
+
 const highlightChips = computed(() => [
   { label: '基础', detail: 'OS / 网络 / 算法' },
   { label: '框架', detail: 'Spring / Vue / Kafka' },
@@ -524,7 +544,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <section id="knowledge-map" class="mt-16 scroll-mt-8 lg:mt-24">
+    <section id="knowledge-map" class="mt-10 scroll-mt-8 lg:mt-14">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
@@ -667,6 +687,38 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
+    </section>
+
+    <section class="mt-8 flex flex-wrap items-center gap-x-2.5 gap-y-2.5" aria-label="相关站点">
+      <p class="mr-1 text-[10.5px] font-medium uppercase tracking-[0.24em] text-ink-faint">Links</p>
+
+      <a
+        v-for="link in externalLinks"
+        :key="link.name"
+        :href="link.href"
+        target="_blank"
+        rel="noreferrer"
+        class="group inline-flex items-center gap-2.5 rounded-xl border border-line bg-canvas/50 py-2 pl-2 pr-3.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-2/60"
+      >
+        <span
+          class="relative inline-flex size-[24px] shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-line bg-surface-2 text-[11px] font-semibold text-ink-faint"
+        >
+          {{ link.name.slice(0, 1) }}
+          <img
+            :src="link.icon"
+            alt=""
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            class="absolute inset-0 size-full object-cover"
+            @error="$event.target.remove()"
+          />
+        </span>
+        <span
+          class="text-[13px] font-medium text-ink-soft transition-colors group-hover:text-primary-ink"
+        >
+          {{ link.name }}
+        </span>
+      </a>
     </section>
 
     <Teleport to="body">
