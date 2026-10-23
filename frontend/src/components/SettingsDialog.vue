@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Keyboard, Monitor, Moon, Settings2, Sun, X } from '@lucide/vue'
+import { Keyboard, LayoutGrid, Monitor, Moon, Radar, Settings2, Sun, X } from '@lucide/vue'
+import { useMapView } from '../composables/useMapView'
 import { useShortcuts, openHelp } from '../composables/useShortcuts'
 import { useTheme } from '../composables/useTheme'
 
@@ -13,6 +14,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const { mode, setMode } = useTheme()
+const { viewMode, supports3d, setView, redetect } = useMapView()
 const panelRef = ref(null)
 const backdropRef = ref(null)
 let lastFocused = null
@@ -23,6 +25,22 @@ const options = [
   { value: 'light', label: '亮色', icon: Sun },
   { value: 'dark', label: '深色', icon: Moon },
 ]
+
+// 知识地图默认视图：与首页知识地图右上角的切换器共用同一份持久化偏好
+const mapViewOptions = [
+  { value: '3d', label: '雷达视图', icon: Radar, hint: '3D 知识雷达（首次进入时才加载）' },
+  { value: 'list', label: '列表视图', icon: LayoutGrid, hint: '章节卡片列表，兼容性最好' },
+]
+
+function mapViewHint(option) {
+  if (option.value === '3d' && !supports3d.value) return '当前设备不支持 WebGL，3D 雷达不可用'
+  return option.hint
+}
+
+function pickMapView(value) {
+  if (value === '3d' && !supports3d.value) return
+  setView(value)
+}
 
 // 模态层：Esc / ? 由快捷键内核统一分发，不再单独挂 document 监听
 useShortcuts(
@@ -162,6 +180,46 @@ onBeforeUnmount(() => {
                 <span class="text-[11.5px] font-medium">{{ option.label }}</span>
               </button>
             </div>
+
+            <div class="mt-5 flex items-baseline justify-between gap-2">
+              <p class="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
+                知识地图默认视图
+              </p>
+              <button
+                type="button"
+                class="-mb-0.5 shrink-0 cursor-pointer text-[10px] font-medium text-primary-ink transition-opacity hover:opacity-70"
+                v-tooltip="'按当前设备能力重新检测，并覆盖已保存的选择'"
+                @click="redetect()"
+              >
+                重置
+              </button>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="知识地图默认视图">
+              <button
+                v-for="option in mapViewOptions"
+                :key="option.value"
+                type="button"
+                role="radio"
+                :aria-checked="viewMode === option.value"
+                :disabled="option.value === '3d' && !supports3d"
+                v-tooltip="mapViewHint(option)"
+                class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40"
+                :class="
+                  viewMode === option.value
+                    ? 'border-primary/45 bg-primary-soft/40 text-primary-ink'
+                    : 'border-line bg-canvas/50 text-ink-soft hover:border-line-strong hover:bg-surface-2/60'
+                "
+                @click="pickMapView(option.value)"
+              >
+                <component :is="option.icon" :size="13" />
+                <span class="text-[11.5px] font-medium">{{ option.label }}</span>
+              </button>
+            </div>
+
+            <p class="mt-2 text-[10px] leading-relaxed text-ink-faint">
+              首次启动按设备能力自动选定并记住结果，之后不再重复检测。
+            </p>
 
             <p class="mt-5 text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
               键盘
