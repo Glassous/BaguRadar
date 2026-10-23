@@ -11,15 +11,24 @@
 
 ```
 BaguRadar/
-├── .github/workflows/        # CI：构建并部署前端
+├── .github/workflows/        # CI：构建并部署前端、部署搜索微服务
 ├── README.md                 # 本文档
+├── server/                   # 全文搜索微服务（零依赖 Node）
+│   ├── index.mjs             # HTTP 入口：路由、参数校验、优雅退出
+│   ├── lib/
+│   │   ├── indexer.mjs       # 内容扫描、内存索引快照、目录热更新
+│   │   ├── search.mjs        # 归一化、多关键词 AND、加权排序、片段高亮
+│   │   └── markdown-text.mjs # Markdown → 纯文本、标题锚点（与前端一致）
+│   ├── deploy/
+│   │   └── baguradar-search.service  # systemd unit 模板
+│   └── package.json
 └── frontend/                 # 前端工程
     ├── plugins/bucket-static.js   # dev/preview 阶段把 /bucket 映射到本地桶目录
     ├── src/
-    │   ├── components/       # 头部、目录树、文章、TOC、状态组件
-    │   ├── composables/      # 目录索引与主题状态
-    │   ├── services/bucket.js     # 桶 fetch 层（基址、超时、缓存、错误）
-    │   ├── utils/            # frontmatter 解析、Markdown 渲染管线
+    │   ├── components/       # 头部、目录树、文章、TOC、顶栏搜索、状态组件
+    │   ├── composables/      # 目录索引、主题状态、随打即搜状态机
+    │   ├── services/         # 桶 fetch 层、搜索接口封装
+    │   ├── utils/            # frontmatter 解析、Markdown 渲染管线、命中定位高亮
     │   └── views/            # 首页、文章页、404
     ├── package.json
     └── vite.config.js
@@ -123,6 +132,131 @@ VITE_BUCKET_BASE_URL=/bucket
 
 > 若前端与桶同域部署，也可以把桶内文件放到站点根路径，并将 `VITE_BUCKET_BASE_URL` 设为 `/`。
 
+## 全文搜索
+
+对象存储只能按路径取文件，浏览器无法可靠地全量检索，因此搜索由服务器上的微服务完成：
+
+```
+BaguRadarFiles ──(GitHub Actions rsync)──▶ /opt/baguradar/content
+                                                   │ 扫描 / 监听
+                                                   ▼
+前端 ──(同域 /api/search)──▶ 1Panel 反代 ──▶ 127.0.0.1:8787（零依赖 Node）
+```
+
+### 目录与职责
+
+| 用途 | 目录 | 说明 |
+| --- | --- | --- |
+| 内容镜像 | `/opt/baguradar/content` | `manifest.json` + `docs/`，结构与 `BaguRadarFiles/` 一致，`rsync --delete-after` 镜像同步 |
+| 服务代码 | `/opt/baguradar/search` | `server/` 产物，systemd 的工作目录 |
+
+不要放进 `/opt/1panel/www/sites/baguradar/index/dist`：该目录由前端部署以 `--delete-after` 清空，且只应存放 nginx 托管的静态产物。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/search?q=&limit=` | 全文检索，`limit` 上限 30，默认 12 |
+| GET | `/api/health` | 索引规模、构建时间与内容目录 |
+| POST | `/api/reindex` | 立即重建索引；默认仅允许回环调用，配置 `SEARCH_ADMIN_TOKEN` 后还需 `X-Admin-Token` |
+
+```json
+{
+  "q": "回溯 剪枝",
+  "total": 8,
+  "took": 6.2,
+  "results": [
+    {
+      "route": "docs/08-interview/algorithm-patterns/backtracking-and-bfs-dfs",
+      "title": "回溯与 DFS/BFS",
+      "chapter": "面试实战",
+      "section": "高频题型",
+      "anchor": "21-回溯三要素",
+      "hits": 4,
+      "snippet": [
+        { "text": "if (需要", "hit": false },
+        { "text": "剪枝", "hit": true },
+        { "text": ") continue;", "hit": false }
+      ],
+      "more": { "before": true, "after": true }
+    }
+  ]
+}
+```
+
+`snippet` 是分段数组而不是 HTML 字符串，前端直接按纯文本渲染，避免桶内容注入脚本。
+
+实现要点：
+
+- 索引在启动时全量构建（约 550 篇 / 5 MB，1 秒内），此后由 `fs.watch` 递归监听 + 30 秒轮询兜底，重建在后台完成并原子替换快照，进程无需重启；
+- 中文不做分词，直接多关键词 AND + 子串匹配，配合 NFKC + 小写归一，标题/标签/描述/标题行/正文分别加权；
+- 服务端生成标题锚点，规则与 `frontend/src/utils/markdown.js` 的 `slugify` 完全一致，保证跳转落点准确。
+
+### 本地开发
+
+```bash
+cd BaguRadar/server
+SEARCH_CONTENT_DIR=../BaguRadarFiles SEARCH_PORT=8787 node index.mjs
+```
+
+Windows PowerShell 下：
+
+```powershell
+cd BaguRadar\server
+$env:SEARCH_CONTENT_DIR='..\BaguRadarFiles'; node index.mjs
+```
+
+`frontend` 的 dev/preview 已把 `/api` 代理到 `http://127.0.0.1:8787`（可用 `SEARCH_PROXY_TARGET` 覆盖）；生产环境默认请求同域 `/api/search`，需要独立地址时用 `VITE_SEARCH_API_BASE` 覆盖。
+
+### 服务器初始化（一次性）
+
+1. 创建目录并授予部署账户写权限：
+
+```bash
+sudo mkdir -p /opt/baguradar/content /opt/baguradar/search
+sudo chown -R ubuntu:ubuntu /opt/baguradar
+chmod 755 /opt/baguradar /opt/baguradar/content /opt/baguradar/search
+```
+
+2. 安装 systemd unit（首次部署后 `server/` 已经在 `/opt/baguradar/search`）：
+
+```bash
+sudo cp /opt/baguradar/search/deploy/baguradar-search.service /etc/systemd/system/
+# 若 `which node` 不是 /usr/bin/node，先改 unit 里的 ExecStart
+sudo systemctl daemon-reload
+sudo systemctl enable --now baguradar-search
+curl -fsS http://127.0.0.1:8787/api/health
+```
+
+3. 让部署账户可以免密重启（`sudoers` 白名单，避免给全量 sudo）：
+
+```bash
+echo 'ubuntu ALL=(root) NOPASSWD: /usr/bin/systemctl restart baguradar-search, /usr/bin/systemctl status baguradar-search' \
+  | sudo tee /etc/sudoers.d/baguradar-search
+sudo chmod 440 /etc/sudoers.d/baguradar-search
+```
+
+> 若 `which systemctl` 不是 `/usr/bin/systemctl`，把上面规则里的路径换成实际路径。
+
+4. 在 1Panel 站点里新增反向代理：`/api` → `http://127.0.0.1:8787`，保留请求路径。同域反代后前端无需 CORS。
+
+5. 在 **BaguRadarFiles** 仓库的 Secrets 中补一份与程序仓库同值的 `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`（可选 `DEPLOY_KNOWN_HOSTS`、Variables `DEPLOY_PORT`、`SEARCH_CONTENT_PATH`、`SEARCH_REINDEX_URL`）。未配置时该步骤输出告警并跳过，不影响 COS 发布。
+
+### 内容更新流程
+
+`BaguRadarFiles` 推送 `docs/**` 或 `manifest.json` 后：
+
+1. 内容照旧同步到 COS（前端阅读不受影响）；
+2. 新增步骤把 `docs/` 与 `manifest.json` 镜像到 `/opt/baguradar/content`；
+3. 随后调用 `POST /api/reindex` 让新内容立即可搜；调用失败时目录监听会在数秒内自动重建。
+
+### 前端交互
+
+- 桌面端：侧栏按钮右侧的常驻长条输入框，随侧栏展开/收起平滑移动；结果浮层显示标题、章/节路径与带上下文的命中片段；
+- 移动端：分享按钮左侧的圆形入口，点击后展开独占整条顶栏，侧栏与分享按钮带位移淡出动画让位，结果区铺满下方，接入系统返回键；
+- 随打即搜：160 ms 防抖 + 自动取消过期请求；`↑`/`↓` 选择、`Enter` 打开、`Esc` 关闭、`Ctrl/Cmd + K` 唤起；
+- 点击结果跳转到文章对应位置并高亮约 2 秒，优先使用 CSS Custom Highlight API 精确高亮命中词，不支持时退化为段落底色提示。
+
 ## 部署
 
 前端是纯静态产物，只需要发布 `frontend/dist/`。构建在 GitHub 托管的 runner 上完成，服务器只接收构建结果，不安装依赖、不执行构建：
@@ -192,12 +326,26 @@ npm run build
 rsync -rlptz --delete-after --chmod=D755,F644 dist/ ubuntu@<服务器地址>:/opt/1panel/www/sites/baguradar/index/dist/
 ```
 
+### 4. 搜索微服务（可选）
+
+| 项 | 值 |
+| --- | --- |
+| 工作流 | `.github/workflows/deploy-search.yml` |
+| 触发条件 | push 到 `main` 且改动 `server/**`，或手动 `Run workflow` |
+| 部署方式 | SSH + `rsync --delete-after` 到 `/opt/baguradar/search`，然后 `sudo -n systemctl restart baguradar-search` |
+| 健康检查 | 远端 `curl http://127.0.0.1:8787/api/health`，失败时输出 `journalctl` 尾部 |
+
+可选 Variables：`SEARCH_PATH`（默认 `/opt/baguradar/search`）、`SEARCH_CONTENT_PATH`（默认 `/opt/baguradar/content`）、`SEARCH_PORT`（默认 `8787`）。搜索服务与前端共用同一组 `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`。
+
+首次部署前请先按上文「全文搜索 → 服务器初始化」创建目录、安装 unit 并配置 sudoers。
+
 ## 设计说明
 
 - 主题：默认跟随系统，可切换亮色 / 深色 / 跟随系统，选择保存在 `localStorage`；
 - 代码高亮：Shiki 使用 JavaScript 正则引擎与按需语言包，浅色 `github-light`、深色 `github-dark`，仅切换 CSS 变量，不重新高亮；
 - 公式：KaTeX 在渲染阶段生成 HTML，不依赖运行时脚本；
-- 内容边界：不包含搜索、收藏、阅读进度、登录与评论等功能。
+- 搜索：内容仍在对象存储，检索由服务器上的零依赖微服务完成，前端只发 `/api/search` 请求；
+- 内容边界：不包含收藏、阅读进度、登录与评论等功能。
 
 ## 许可协议
 

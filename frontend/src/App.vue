@@ -1,7 +1,8 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Share2 } from '@lucide/vue'
+import AppSearch from './components/AppSearch.vue'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTitlebar from './components/AppTitlebar.vue'
 import { useBackClose } from './composables/useBackClose'
@@ -13,6 +14,8 @@ const route = useRoute()
 const { ensureCatalog } = useCatalog()
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
+const searchExpanded = ref(false)
+const isDesktopViewport = ref(true)
 const mainRef = ref(null)
 const desktopMedia = window.matchMedia(DESKTOP_QUERY)
 const year = new Date().getFullYear()
@@ -23,11 +26,15 @@ provide('appScrollEl', mainRef)
 // 移动端抽屉接入返回键/返回手势
 useBackClose('sidebar', sidebarOpen)
 
+// 移动端搜索展开后，两侧浮动按钮让位（推出屏幕）
+const searchPushed = computed(() => searchExpanded.value && !isDesktopViewport.value)
+
 function isDesktop() {
   return desktopMedia.matches
 }
 
 function handleDesktopChange(event) {
+  isDesktopViewport.value = event.matches
   // 进入桌面断点后抽屉不再是浮层，顺手清掉它的历史记录
   if (event.matches) sidebarOpen.value = false
 }
@@ -86,11 +93,14 @@ watch(
   async () => {
     sidebarOpen.value = false
     await nextTick()
+    // 搜索结果跳转由 DocView 定位到命中段落，这里不能把滚动位置重置到顶部
+    if (route.query.q) return
     mainRef.value?.scrollTo({ top: 0, behavior: 'instant' })
   },
 )
 
 onMounted(() => {
+  isDesktopViewport.value = desktopMedia.matches
   desktopMedia.addEventListener('change', handleDesktopChange)
   ensureCatalog()
 })
@@ -109,8 +119,11 @@ onBeforeUnmount(() => {
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color] duration-300 ease-out hover:border-primary/45 hover:shadow-lg lg:size-10"
-      :class="sidebarCollapsed ? '' : 'lg:left-[324px]'"
+      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:shadow-lg lg:size-10"
+      :class="[
+        sidebarCollapsed ? '' : 'lg:left-[324px]',
+        searchPushed ? 'pointer-events-none -translate-x-[160%] opacity-0' : '',
+      ]"
       aria-label="切换侧栏"
       aria-controls="app-sidebar"
       :aria-expanded="!sidebarCollapsed"
@@ -125,13 +138,20 @@ onBeforeUnmount(() => {
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="app-float-action fixed right-[calc(0.75rem+var(--safe-right))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-soft transition-[box-shadow,border-color,color] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-10"
+      class="app-float-action fixed right-[calc(0.75rem+var(--safe-right))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-soft transition-[box-shadow,border-color,color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-10"
+      :class="searchPushed ? 'pointer-events-none translate-x-[160%] opacity-0' : ''"
       aria-label="复制本页链接"
       title="复制本页链接"
       @click="copyPageLink"
     >
       <Share2 :size="16" />
     </button>
+
+    <AppSearch
+      v-show="!sidebarOpen"
+      v-model:expanded="searchExpanded"
+      :collapsed="sidebarCollapsed"
+    />
 
     <Transition
       enter-active-class="transition duration-200 ease-out"

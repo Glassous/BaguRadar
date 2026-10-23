@@ -1,0 +1,15 @@
+{
+  "name": "baguradar-search",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "BaguRadar 全文搜索微服务（零依赖，读取服务器上的内容镜像）",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "check": "node --check index.mjs"
+  }
+}

@@ -1,0 +1,41 @@
+[Unit]
+Description=BaguRadar full-text search service
+Documentation=https://github.com/Glassous/BaguRadar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 部署账户（与 DEPLOY_USER 保持一致）
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/baguradar/search
+Environment=NODE_ENV=production
+Environment=SEARCH_HOST=127.0.0.1
+Environment=SEARCH_PORT=8787
+Environment=SEARCH_CONTENT_DIR=/opt/baguradar/content
+# 若 node 不在 /usr/bin/node（例如通过 nvm 安装），改成 `which node` 的输出
+ExecStart=/usr/bin/node /opt/baguradar/search/index.mjs
+Restart=always
+RestartSec=3
+TimeoutStopSec=10
+
+# 只读内容镜像：服务只读文件，不会写回任何内容
+ProtectSystem=strict
+ReadOnlyPaths=/opt/baguradar/content
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryMax=512M
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=baguradar-search
+
+[Install]
+WantedBy=multi-user.target

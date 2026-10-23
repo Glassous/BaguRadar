@@ -6,6 +6,14 @@ import bucketStatic from './plugins/bucket-static.js'
 
 const bucketRoot = fileURLToPath(new URL('../../BaguRadarFiles', import.meta.url))
 
+// 本地调试搜索服务：先 `cd server && npm start`，前端 /api 会转发到 127.0.0.1:8787
+const searchProxy = {
+  '/api': {
+    target: process.env.SEARCH_PROXY_TARGET || 'http://127.0.0.1:8787',
+    changeOrigin: false,
+  },
+}
+
 export default defineConfig({
   plugins: [
     vue({
@@ -28,11 +36,13 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
     port: 5173,
+    proxy: searchProxy,
   },
   preview: {
     host: '0.0.0.0',
     allowedHosts: true,
     port: 4173,
+    proxy: searchProxy,
   },
   build: {
     chunkSizeWarningLimit: 1400,

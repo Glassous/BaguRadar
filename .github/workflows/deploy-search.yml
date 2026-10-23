@@ -1,0 +1,121 @@
+# 把 server/ 部署到服务器并以 systemd 重启搜索微服务。
+# 与 deploy-frontend.yml 复用同一组服务器变量：
+#   Secrets：DEPLOY_HOST、DEPLOY_USER、DEPLOY_SSH_KEY、DEPLOY_KNOWN_HOSTS（可选）
+#   Variables：DEPLOY_PORT（可选，默认 22）、SEARCH_PATH（可选，默认 /opt/baguradar/search）、
+#              SEARCH_CONTENT_PATH（可选，默认 /opt/baguradar/content）、SEARCH_PORT（可选，默认 8787）
+name: Deploy Search Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-search.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-search
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 部署搜索微服务
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      SEARCH_PATH: ${{ vars.SEARCH_PATH || '/opt/baguradar/search' }}
+      SEARCH_CONTENT_PATH: ${{ vars.SEARCH_CONTENT_PATH || '/opt/baguradar/content' }}
+      SEARCH_PORT: ${{ vars.SEARCH_PORT || '8787' }}
+      SEARCH_SERVICE: baguradar-search
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 校验服务端脚本语法
+        run: |
+          set -euo pipefail
+          find server -name '*.mjs' -print0 | xargs -0 -n1 node --check
+          echo "语法校验通过：$(find server -name '*.mjs' | wc -l) 个文件"
+
+      - name: 校验部署变量
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+            if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::缺少必需的仓库 Secret：$missing"
+            exit 1
+          fi
+          echo "部署目标：$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PORT$SEARCH_PATH"
+          echo "内容目录：$SEARCH_CONTENT_PATH"
+
+      - name: 准备 SSH
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          ssh-keygen -y -f "$HOME/.ssh/deploy_key" > /dev/null
+
+          if [ -n "${DEPLOY_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: 确保目标目录存在
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$SEARCH_PATH' '$SEARCH_CONTENT_PATH'"
+
+      - name: 同步服务代码
+        run: |
+          set -euo pipefail
+          rsync -rlptz --delete-after --chmod=D755,F644 \
+            -e "ssh -i $HOME/.ssh/deploy_key -p $DEPLOY_PORT -o BatchMode=yes" \
+            server/ "$DEPLOY_USER@$DEPLOY_HOST:$SEARCH_PATH/"
+
+      - name: 重启搜索服务
+        run: |
+          set -euo pipefail
+          if ! ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n systemctl restart '$SEARCH_SERVICE'"; then
+            echo "::error::重启 $SEARCH_SERVICE 失败：确认已安装 systemd unit，且部署账户可免密执行 systemctl restart $SEARCH_SERVICE"
+            exit 1
+          fi
+
+      - name: 健康检查
+        run: |
+          set -euo pipefail
+          ssh_cmd=(ssh -i "$HOME/.ssh/deploy_key" -p "$DEPLOY_PORT" -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST")
+          for attempt in $(seq 1 10); do
+            if body=$("${ssh_cmd[@]}" "curl -fsS --max-time 3 http://127.0.0.1:$SEARCH_PORT/api/health" 2>/dev/null); then
+              echo "健康检查通过：$body"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::搜索服务健康检查失败，以下为最近日志"
+          "${ssh_cmd[@]}" "journalctl -u '$SEARCH_SERVICE' -n 40 --no-pager" || true
+          exit 1

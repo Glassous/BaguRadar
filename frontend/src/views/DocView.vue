@@ -9,6 +9,7 @@ import { useReadingPosition } from '../composables/useReadingPosition'
 import { loadArticle } from '../services/bucket'
 import { parseFrontmatter } from '../utils/frontmatter'
 import { ensureHighlighter, renderMarkdown } from '../utils/markdown'
+import { clearSearchHit, locateSearchHit } from '../utils/searchHit'
 
 const SAVE_DELAY = 240
 const MIN_OFFSET = 24
@@ -136,10 +137,33 @@ function routePath() {
   return (Array.isArray(value) ? value.join('/') : value || '').replace(/\.md$/i, '')
 }
 
+function queryString(value) {
+  return Array.isArray(value) ? value[0] || '' : String(value || '')
+}
+
+// 搜索结果跳转：等文章渲染完成后滚动到命中位置并高亮 2 秒
+async function applySearchHit(token) {
+  const term = queryString(route.query.q)
+  if (!term) return
+
+  await nextTick()
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (token !== requestToken) return
+      locateSearchHit({
+        root: document.querySelector('.article-body'),
+        query: term,
+        anchor: queryString(route.query.a),
+      })
+    })
+  })
+}
+
 async function load() {
   const token = ++requestToken
   // 离开当前文章前先落一次位置，滚动容器随后会被重置到顶部
   persistScroll()
+  clearSearchHit()
   loading.value = true
   error.value = ''
   missing.value = false
@@ -205,6 +229,8 @@ async function load() {
   const saved = lastPosition.value
   if (route.query.resume && saved && saved.route === merged.route) {
     restoreScroll(saved)
+  } else {
+    void applySearchHit(token)
   }
 }
 
@@ -213,6 +239,7 @@ onBeforeUnmount(() => {
   finishRestore()
   persistScroll()
   untrackScroll()
+  clearSearchHit()
 })
 
 watch(() => route.fullPath, load, { immediate: true })
