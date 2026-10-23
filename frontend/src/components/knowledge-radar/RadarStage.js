@@ -294,27 +294,36 @@ export class RadarStage {
       item.el.style.visibility = 'visible'
       entries.push({
         item,
+        target,
         x: ((world.x + 1) / 2) * width,
         y: ((1 - world.y) / 2) * height,
-        priority: this.selectedId === target.id ? 3 : this.hoverId === target.id ? 2 : 1,
       })
     }
 
-    entries.sort((a, b) => b.priority - a.priority || a.y - b.y)
+    // 固定按章节序号占位：悬停 / 选中不再改变顺序，标签不会因为交互而整片重排（漂移）
+    entries.sort((a, b) => a.target.config.index - b.target.config.index)
 
     for (const entry of entries) {
       // 用真实渲染尺寸做屏幕空间避让，避免不同标题长度造成的估算误差。
-      // 依次尝试原位、上移、下移、再上移/下移，优先保持标签贴近锚点。
+      // 优先沿用上一次的错位量：只有确实碰撞时才重新安排，位置才稳定。
       const labelWidth = entry.item.el.offsetWidth || 118
       const labelHeight = entry.item.el.offsetHeight || 34
       const step = labelHeight + 5
-      const candidates =
-        entry.priority > 1
-          ? [0]
-          : [0, -step, step, -step * 2, step * 2, -step * 3, step * 3]
+      const currentShift = entry.item.shift || 0
+      const candidates = [
+        currentShift,
+        0,
+        -step,
+        step,
+        -step * 2,
+        step * 2,
+        -step * 3,
+        step * 3,
+      ]
 
       let chosen = null
       let fallback = null
+      const tried = new Set()
       const buildRect = (shift) => {
         const top = entry.y - labelHeight / 2 + shift
         return {
@@ -326,6 +335,8 @@ export class RadarStage {
       }
 
       for (const shift of candidates) {
+        if (tried.has(shift)) continue
+        tried.add(shift)
         const rect = buildRect(shift)
         if (rect.top < 10 || rect.bottom > height - 10) continue
         const collided = placed.some(
@@ -346,11 +357,13 @@ export class RadarStage {
 
       const result = chosen || fallback
       if (!result) {
+        entry.item.shift = 0
         entry.item.el.style.marginTop = '0px'
         entry.item.el.style.setProperty('--leader', '0px')
         entry.item.el.classList.remove('is-below')
         continue
       }
+      entry.item.shift = result.shift
       entry.item.el.style.marginTop = `${result.shift}px`
       entry.item.el.style.setProperty('--leader', `${Math.abs(result.shift)}px`)
       entry.item.el.classList.toggle('is-below', result.shift > 0)
@@ -491,6 +504,13 @@ export class RadarStage {
       })
       return
     }
+    // 记录选中前的标签位置：大卡片弹窗用它做 Flip 起点，避免标签因选中态挪位导致动画跳一下
+    const labelEl = this.labels?.get(id)?.el
+    const rect = labelEl?.getBoundingClientRect()
+    this.selectionRect = rect
+      ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      : null
+
     this.selectedId = id
     this.focusZoneKey = null
     this.refreshAllLabels()
@@ -703,10 +723,20 @@ export class RadarStage {
     const vector = new THREE.Vector3()
     target.labelAnchor.getWorldPosition(vector).project(this.camera)
     const rect = this.canvas.getBoundingClientRect()
+    // 同时给出标签卡片自身的屏幕矩形：弹窗用它做 Flip 起点，才能像普通模式一样“从卡片长出来”
+    const labelEl = this.labels?.get(id)?.el
+    const liveRect = labelEl?.getBoundingClientRect()
+    const labelRect =
+      this.selectionRect && this.selectedId === id
+        ? this.selectionRect
+        : liveRect
+          ? { x: liveRect.x, y: liveRect.y, width: liveRect.width, height: liveRect.height }
+          : null
     return {
       x: rect.left + ((vector.x + 1) / 2) * rect.width,
       y: rect.top + ((1 - vector.y) / 2) * rect.height,
       visible: vector.z < 1,
+      labelRect,
     }
   }
 
@@ -763,7 +793,7 @@ export class RadarStage {
       this.callbacks.onTick?.(this.getSnapshot())
     }
 
-    if (this.elapsed - this.lastLabelRefresh > 0.2) {
+    if (this.elapsed - this.lastLabelRefresh > 0.12) {
       this.lastLabelRefresh = this.elapsed
       this.refreshAllLabels()
     }

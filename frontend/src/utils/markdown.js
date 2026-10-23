@@ -194,12 +194,29 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   if (/^https?:\/\//i.test(href)) {
     token.attrSet('target', '_blank')
     token.attrSet('rel', 'noopener noreferrer')
+  } else if (env?.docDir && isRelativeDocLink(href)) {
+    token.attrSet('href', `#/doc/${resolveDocPath(href, env.docDir)}`)
   }
   return defaultLinkOpen(tokens, idx, options, env, self)
 }
 
-export function renderMarkdown(source) {
-  const env = {}
+function isRelativeDocLink(href) {
+  return !href.startsWith('#') && !href.startsWith('/') && !href.startsWith('//') && /\.md(?:#.*)?$/i.test(href)
+}
+
+// 把相对 .md 链接解析为 manifest 中的文档 id（去掉 .md 后缀），供 hash 路由跳转
+function resolveDocPath(href, baseDir) {
+  const parts = String(baseDir).split('/').filter(Boolean)
+  for (const part of href.split('#')[0].split('/')) {
+    if (!part || part === '.') continue
+    if (part === '..') parts.pop()
+    else parts.push(part)
+  }
+  return parts.join('/').replace(/\.md$/i, '')
+}
+
+export function renderMarkdown(source, options = {}) {
+  const env = { docDir: options.docDir || '' }
   const tokens = md.parse(source, env)
   const toc = []
 

@@ -62,6 +62,7 @@
   transition:
     opacity 220ms ease,
     transform 200ms ease,
+    margin-top 240ms ease,
     background 240ms ease,
     box-shadow 240ms ease,
     color 240ms ease,

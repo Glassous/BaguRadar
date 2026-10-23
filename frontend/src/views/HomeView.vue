@@ -6,13 +6,16 @@ import { Flip } from 'gsap/Flip'
 import { ArrowRight, Bookmark, LayoutGrid, Radar, Sparkles, X } from '@lucide/vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatePanel from '../components/StatePanel.vue'
+import { resolveTargets, ZONES } from '../components/knowledge-radar/chapterConfig'
 import { useCatalog } from '../composables/useCatalog'
 import { useReadingPosition } from '../composables/useReadingPosition'
 
 gsap.registerPlugin(Flip)
 
-const OPEN_PROPS = 'fontSize,borderRadius,color,backgroundColor'
-const CLOSE_PROPS = 'fontSize,borderRadius,color'
+// 只插值尺寸类属性：Tailwind v4 的半透明色是 color-mix(in oklab, …)，
+// 交给 GSAP 插值会写出非法的 oklab 分量（a/b 被塞成 255），浏览器渲染成黄红色 → 闪烁
+const OPEN_PROPS = 'fontSize,borderRadius'
+const CLOSE_PROPS = 'fontSize,borderRadius'
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // 3D 知识雷达按需加载：three 体积较大，只在真正需要时拉取
@@ -124,7 +127,12 @@ const fromRadar = ref(false)
 const anchorStyle = computed(() => {
   const anchor = flipAnchor.value
   if (!anchor) return {}
-  return { left: `${anchor.x}px`, top: `${anchor.y}px` }
+  return {
+    left: `${anchor.x}px`,
+    top: `${anchor.y}px`,
+    width: `${anchor.w || 268}px`,
+    height: `${anchor.h || 124}px`,
+  }
 })
 
 const activeChapterIndex = computed(() => {
@@ -141,6 +149,14 @@ const activeSections = computed(() => {
     )
     return { ...section, route: firstDoc?.route || '' }
   })
+})
+
+// 章节所属雷达区域：弹窗皮肤用它做顶部色带与右上光斑，和 3D 场景里的标签呼应
+const activeZone = computed(() => {
+  const chapter = activeChapter.value
+  if (!chapter) return ZONES.peak
+  const target = resolveTargets(chapters.value).find((item) => item.id === chapter.id)
+  return ZONES[target?.zone] || ZONES.peak
 })
 
 async function openChapter(chapter, source) {
@@ -186,7 +202,8 @@ async function openChapter(chapter, source) {
     props: OPEN_PROPS,
     onComplete: () => {
       gsap.set([panelTitle, panelDesc], { clearProps: 'overflow' })
-      gsap.set(extras, { autoAlpha: 1 })
+      // 区域色带 / 光斑淡入，避免落位瞬间整块颜色"啪"地弹出来像闪烁
+      gsap.to(extras, { autoAlpha: 1, duration: reduceMotion ? 0 : 0.24, ease: 'power1.out' })
       activeFlip = null
     },
   })
@@ -328,13 +345,23 @@ async function openChapterFromRadar(id) {
     return
   }
 
-  const width = 268
-  const height = 124
-  flipAnchor.value = {
-    x: Math.round(point.x - width / 2),
-    y: Math.round(point.y - height * 0.66),
-    chapter,
-  }
+  // 起点直接取标签卡片自身的矩形：弹窗就从用户点的那张卡片长大
+  const labelRect = point.labelRect
+  flipAnchor.value = labelRect
+    ? {
+        x: Math.round(labelRect.x),
+        y: Math.round(labelRect.y),
+        w: Math.round(labelRect.width),
+        h: Math.round(labelRect.height),
+        chapter,
+      }
+    : {
+        x: Math.round(point.x - 134),
+        y: Math.round(point.y - 82),
+        w: 268,
+        h: 124,
+        chapter,
+      }
   fromRadar.value = true
   await nextTick()
   if (!anchorRef.value) return
@@ -348,6 +375,8 @@ async function openChapterFromRadarFallback(chapter) {
   flipAnchor.value = {
     x: Math.round((rect?.left || 0) + (rect?.width || 640) / 2 - 134),
     y: Math.round((rect?.top || 0) + (rect?.height || 480) / 2 - 80),
+    w: 268,
+    h: 124,
     chapter,
   }
   fromRadar.value = true
@@ -620,25 +649,31 @@ onBeforeUnmount(() => {
     </section>
 
     <Teleport to="body">
-      <!-- 3D 目标投影锚点：Flip 从这里把“锁定卡片”展开成章节弹窗 -->
+      <!-- 3D 目标投影锚点：尺寸与标签卡片一致，Flip 才能像普通模式一样从标签位置展开 -->
       <div
         v-if="flipAnchor"
         ref="anchorRef"
         :style="anchorStyle"
+        :data-flip-id="`chapter-card-${flipAnchor.chapter.id}`"
         :class="activeChapter ? 'invisible' : ''"
-        class="pointer-events-none fixed z-40 w-[268px] overflow-hidden rounded-2xl border border-primary/40 bg-[#04100f] p-4 shadow-2xl"
+        class="pointer-events-none fixed z-40 overflow-hidden rounded-[4px_8px_8px_4px] border-l-2 border-primary/60 bg-[#041918]/92 p-1 shadow-2xl backdrop-blur-sm"
         aria-hidden="true"
       >
-        <div class="flex items-center justify-between font-mono text-[9px] tracking-[0.16em] text-[#5eead4]/70">
-          <span>RADAR LOCK · CH.{{ String(flipAnchor.chapter.id).slice(0, 2) }}</span>
+        <div class="flex items-center justify-between font-mono text-[7px] tracking-[0.14em] text-[#5eead4]/80">
+          <span>CH.{{ String(flipAnchor.chapter.id).slice(0, 2) }}</span>
           <span>{{ flipAnchor.chapter.docCount }} 篇</span>
         </div>
-        <h3 data-flip-part="title" class="mt-2 text-[16px] font-semibold leading-tight text-[#d8fff7]">
+        <h3
+          data-flip-part="title"
+          :data-flip-id="`chapter-title-${flipAnchor.chapter.id}`"
+          class="text-[10px] font-semibold leading-tight tracking-tight text-[#d8fff7]"
+        >
           {{ flipAnchor.chapter.title }}
         </h3>
         <p
           data-flip-part="desc"
-          class="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[#8fd8cf]/80"
+          :data-flip-id="`chapter-desc-${flipAnchor.chapter.id}`"
+          class="line-clamp-2 text-[7.5px] leading-tight text-[#8fd8cf]/80"
         >
           {{ flipAnchor.chapter.description }}
         </p>
@@ -663,23 +698,43 @@ onBeforeUnmount(() => {
           aria-labelledby="chapter-detail-title"
           tabindex="-1"
           :data-flip-id="`chapter-card-${activeChapter.id}`"
-          class="relative flex max-h-[min(82dvh,660px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[24px] border border-line bg-surface shadow-2xl outline-none"
+          class="relative flex max-h-[min(82dvh,660px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[24px] border border-line bg-surface/95 shadow-lift outline-none backdrop-blur-xl"
         >
+          <!-- 新皮肤：顶部一条区域色细线，与 3D 场景里的雷达标语汇 -->
+          <span
+            data-detail-extra
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-x-0 top-0 z-10 h-[2px] opacity-70"
+            :style="{
+              background: `linear-gradient(90deg, ${activeZone.color}, color-mix(in srgb, ${activeZone.color} 30%, transparent) 58%, transparent)`,
+            }"
+          />
+
           <div class="relative px-6 pb-5 pt-6 sm:px-8 sm:pt-7">
             <button
               type="button"
               data-detail-extra
-              class="absolute right-4 top-4 inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink sm:right-5 sm:top-5"
+              class="absolute right-4 top-4 z-10 inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink sm:right-5 sm:top-5"
               aria-label="关闭章节详情"
               @click="closeChapter"
             >
               <X :size="16" />
             </button>
 
-            <p data-detail-extra class="font-mono text-[10px] tracking-[0.18em] text-ink-faint">
-              CH.{{ String(activeChapterIndex).padStart(2, '0') }} · {{ activeChapter.sections.length }}
-              个小节 · {{ activeChapter.docCount }} 篇
-            </p>
+            <div data-detail-extra class="flex flex-wrap items-center gap-2">
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/70 px-2 py-0.5 font-mono text-[10px] tracking-[0.14em] text-ink-faint"
+              >
+                <span class="size-1.5 rounded-full" :style="{ background: activeZone.color }" />
+                CH.{{ String(activeChapterIndex).padStart(2, '0') }}
+              </span>
+              <span class="font-mono text-[10px] tracking-[0.12em] text-ink-faint">
+                {{ activeZone.en }}
+              </span>
+              <span class="text-[10px] text-ink-faint">
+                · {{ activeChapter.sections.length }} 个小节 · {{ activeChapter.docCount }} 篇
+              </span>
+            </div>
 
             <h2
               id="chapter-detail-title"
@@ -710,7 +765,7 @@ onBeforeUnmount(() => {
                 :key="section.id"
                 data-detail-extra
                 :to="`/doc/${section.route || activeChapter.firstRoute}`"
-                class="group flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas/40 px-3.5 py-2.5 transition-colors hover:border-primary/40 hover:bg-surface-2/60"
+                class="group flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas/40 px-3.5 py-2.5 transition-all duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-surface-2/60 hover:shadow-soft"
               >
                 <span class="flex min-w-0 items-center gap-2">
                   <span class="font-mono text-[10px] text-ink-faint">
@@ -727,7 +782,7 @@ onBeforeUnmount(() => {
 
           <div
             data-detail-extra
-            class="flex shrink-0 items-center justify-between gap-3 border-t border-line px-6 py-4 sm:px-8"
+            class="flex shrink-0 items-center justify-between gap-3 border-t border-line bg-surface-2/40 px-6 py-4 sm:px-8"
           >
             <span class="text-[10.5px] text-ink-faint">共 {{ activeChapter.docCount }} 篇文章</span>
             <RouterLink

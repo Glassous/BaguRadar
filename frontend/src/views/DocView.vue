@@ -181,7 +181,9 @@ async function load() {
   await ensureHighlighter()
   if (token !== requestToken) return
 
-  const result = renderMarkdown(parsed.content)
+  const result = renderMarkdown(parsed.content, {
+    docDir: target.path.split('/').slice(0, -1).join('/'),
+  })
   const merged = {
     ...target,
     title: parsed.meta.title || target.title,
