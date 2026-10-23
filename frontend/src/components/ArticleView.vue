@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, ChevronLeft, ChevronRight, Clock } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, Clock } from '@lucide/vue'
 import ArticleToc from './ArticleToc.vue'
 import { useTheme } from '../composables/useTheme'
 import { renderDiagrams } from '../utils/mermaid'
@@ -164,12 +164,12 @@ onBeforeUnmount(() => {
         v-if="prev"
         :to="`/doc/${prev.route}`"
         aria-keyshortcuts="p"
-        v-tooltip="{ text: '上一篇', key: 'p' }"
         class="group card-lift flex flex-col gap-1 rounded-xl border border-line bg-surface/50 px-4 py-3"
       >
-        <span class="inline-flex items-center gap-1 text-[10.5px] text-ink-faint">
-          <ChevronLeft :size="12" class="transition-transform group-hover:-translate-x-0.5" />
+        <span class="inline-flex items-center gap-1.5 text-[13px] text-ink-faint">
+          <ChevronLeft :size="16" class="transition-transform group-hover:-translate-x-0.5" />
           上一篇
+          <kbd class="kbd-chip kbd-chip--nav">p</kbd>
         </span>
         <span class="text-[13px] font-medium text-ink">{{ prev.title }}</span>
         <span class="text-[10.5px] text-ink-faint">{{ prev.section?.title || prev.chapter?.title }}</span>
@@ -180,12 +180,12 @@ onBeforeUnmount(() => {
         v-if="next"
         :to="`/doc/${next.route}`"
         aria-keyshortcuts="n"
-        v-tooltip="{ text: '下一篇', key: 'n' }"
         class="group card-lift flex flex-col items-end gap-1 rounded-xl border border-line bg-surface/50 px-4 py-3 text-right"
       >
-        <span class="inline-flex items-center gap-1 text-[10.5px] text-ink-faint">
+        <span class="inline-flex items-center gap-1.5 text-[13px] text-ink-faint">
           下一篇
-          <ArrowRight :size="12" class="transition-transform group-hover:translate-x-0.5" />
+          <kbd class="kbd-chip kbd-chip--nav">n</kbd>
+          <ChevronRight :size="16" class="transition-transform group-hover:translate-x-0.5" />
         </span>
         <span class="text-[13px] font-medium text-ink">{{ next.title }}</span>
         <span class="text-[10.5px] text-ink-faint">{{ next.section?.title || next.chapter?.title }}</span>
