@@ -1,20 +1,28 @@
 <script setup>
 import { inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ArticleToc from '../components/ArticleToc.vue'
 import ArticleView from '../components/ArticleView.vue'
 import StatePanel from '../components/StatePanel.vue'
 import { useCatalog } from '../composables/useCatalog'
 import { useReadingPosition } from '../composables/useReadingPosition'
+import { useShortcuts } from '../composables/useShortcuts'
+import { useToast } from '../composables/useToast'
 import { loadArticle } from '../services/bucket'
+import { copyText } from '../utils/clipboard'
 import { parseFrontmatter } from '../utils/frontmatter'
 import { ensureHighlighter, renderMarkdown } from '../utils/markdown'
 import { clearSearchHit, locateSearchHit } from '../utils/searchHit'
 
 const SAVE_DELAY = 240
 const MIN_OFFSET = 24
+// 单键滚动的幅度与标题定位的偏移：45% 大致是一屏的可阅读行数
+const SCROLL_RATIO = 0.45
+const SECTION_OFFSET = 72
 
 const route = useRoute()
+const router = useRouter()
+const { showToast } = useToast()
 const { state, ensureCatalog, getDocByRoute, getNeighbors } = useCatalog()
 const { lastPosition, saveReadingPosition } = useReadingPosition()
 // 正文滚动发生在外层的 main 容器上，由 App 注入，缺失时回退到类名查找
@@ -233,6 +241,119 @@ async function load() {
     void applySearchHit(token)
   }
 }
+
+function scrollByRatio(ratio) {
+  const el = scrollContainer()
+  if (!el) return
+  el.scrollBy({ top: Math.round(el.clientHeight * ratio), behavior: 'smooth' })
+}
+
+// 整屏翻页留 12% 重叠，跨页时还能看到上一页最后一行的上下文
+function pageBy(direction) {
+  const el = scrollContainer()
+  if (!el) return
+  el.scrollBy({ top: Math.round(el.clientHeight * 0.88) * direction, behavior: 'smooth' })
+}
+
+function jumpSection(direction) {
+  const body = document.querySelector('.article-body')
+  if (!body) return
+  const headings = Array.from(body.querySelectorAll('h2[id], h3[id], h4[id]'))
+  if (!headings.length) return
+
+  const el = scrollContainer()
+  const anchorTop = (el?.getBoundingClientRect().top || 0) + SECTION_OFFSET
+  // 当前位置 = 已经越过容器顶部偏移的最后一个标题
+  let current = -1
+  headings.forEach((heading, index) => {
+    if (heading.getBoundingClientRect().top <= anchorTop) current = index
+  })
+
+  const target = headings[Math.min(headings.length - 1, Math.max(0, current + direction))]
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function goNeighbor(direction) {
+  const target = direction === 'next' ? next.value : prev.value
+  if (!target) return
+  router.push(`/doc/${target.route}`)
+}
+
+function scrollToEdge(edge) {
+  const el = scrollContainer()
+  if (!el) return
+  el.scrollTo({ top: edge === 'bottom' ? el.scrollHeight : 0, behavior: 'smooth' })
+}
+
+function visibleCodeBlock() {
+  const blocks = Array.from(document.querySelectorAll('.article-body .code-block pre'))
+  if (!blocks.length) return null
+
+  let picked = null
+  let pickedArea = 0
+  for (const block of blocks) {
+    const rect = block.getBoundingClientRect()
+    const visible = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0)
+    if (visible > pickedArea) {
+      pickedArea = visible
+      picked = block
+    }
+  }
+  // 只擦到一点边的不算“视口内代码块”，避免复制出半屏之外的代码
+  return pickedArea >= 48 ? picked : null
+}
+
+async function copyPageLink() {
+  try {
+    await copyText(window.location.href)
+    showToast('链接已复制')
+  } catch (error) {
+    console.error('[BaguRadar] 复制链接失败', error)
+    showToast('复制失败')
+  }
+}
+
+async function copyVisibleCode() {
+  const block = visibleCodeBlock()
+  if (!block) {
+    showToast('当前视口没有代码块')
+    return
+  }
+
+  const code = block.innerText || ''
+  if (!code.trim()) {
+    showToast('当前代码块为空')
+    return
+  }
+
+  try {
+    await copyText(code)
+    showToast('代码已复制')
+  } catch (error) {
+    console.error('[BaguRadar] 复制代码失败', error)
+    showToast('复制失败')
+  }
+}
+
+// 阅读层：文章真正加载完成后才生效，加载态下按键不应触达滚动逻辑
+useShortcuts(
+  'doc-reading',
+  {
+    j: () => scrollByRatio(SCROLL_RATIO),
+    k: () => scrollByRatio(-SCROLL_RATIO),
+    space: () => pageBy(1),
+    'shift+space': () => pageBy(-1),
+    h: () => jumpSection(-1),
+    l: () => jumpSection(1),
+    p: () => goNeighbor('prev'),
+    n: () => goNeighbor('next'),
+    'g g': () => scrollToEdge('top'),
+    G: () => scrollToEdge('bottom'),
+    c: () => copyPageLink(),
+    C: () => copyVisibleCode(),
+  },
+  { priority: 5, active: () => !loading.value && !missing.value && Boolean(doc.value) },
+)
 
 onBeforeUnmount(() => {
   window.clearTimeout(saveTimer)

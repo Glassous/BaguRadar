@@ -2,11 +2,12 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { scrollbar } from './directives/scrollbar'
+import { tooltip } from './directives/tooltip'
 import { prewarmHighlighter } from './utils/markdown'
 import 'katex/dist/katex.min.css'
 import './style.css'
 
-createApp(App).directive('scrollbar', scrollbar).use(router).mount('#app')
+createApp(App).directive('scrollbar', scrollbar).directive('tooltip', tooltip).use(router).mount('#app')
 
 const runPrewarm = () => {
   prewarmHighlighter().catch((error) => {

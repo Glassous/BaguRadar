@@ -112,10 +112,6 @@ watch(
   { immediate: true },
 )
 
-const totalLabel = computed(() =>
-  stats.value.updatedAt ? `最近更新 ${stats.value.updatedAt}` : '内容持续同步中',
-)
-
 // 上次阅读记录：文章仍在目录里才算有效，否则回落成“开始阅读”
 const resumeTarget = computed(() => {
   const saved = lastPosition.value
@@ -488,7 +484,7 @@ onBeforeUnmount(() => {
           <RouterLink
             v-if="startLink"
             :to="startLink"
-            :title="resumeTarget ? `上次读到《${resumeTarget.title}》` : undefined"
+            v-tooltip="resumeTarget ? `上次读到《${resumeTarget.title}》` : ''"
             class="group inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-medium text-white shadow-soft transition-all duration-200 hover:bg-primary-ink hover:shadow-lg"
           >
             {{ resumeTarget ? '继续上次位置' : '开始阅读' }}
@@ -527,9 +523,6 @@ onBeforeUnmount(() => {
             <dd class="font-mono text-[26px] font-semibold tabular-nums text-primary-ink">
               {{ String(shown.docs).padStart(2, '0') }}
             </dd>
-          </div>
-          <div class="ml-auto hidden pb-1 text-right text-[10.5px] leading-relaxed text-ink-faint sm:block">
-            {{ totalLabel }}
           </div>
         </dl>
       </div>
@@ -590,7 +583,7 @@ onBeforeUnmount(() => {
             role="tab"
             :aria-selected="viewMode === '3d'"
             :disabled="forceList || !supports3d"
-            :title="
+            v-tooltip="
               forceList || !supports3d
                 ? '当前设备不支持 WebGL，3D 雷达不可用'
                 : '启动 3D 雷达（首次启动时才加载）'
@@ -753,6 +746,7 @@ onBeforeUnmount(() => {
           v-if="activeChapter"
           ref="panelRef"
           role="dialog"
+          data-overlay="chapter-detail"
           aria-labelledby="chapter-detail-title"
           tabindex="-1"
           :data-flip-id="`chapter-card-${activeChapter.id}`"

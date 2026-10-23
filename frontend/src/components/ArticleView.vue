@@ -121,6 +121,8 @@ onBeforeUnmount(() => {
       <RouterLink
         v-if="prev"
         :to="`/doc/${prev.route}`"
+        aria-keyshortcuts="p"
+        v-tooltip="{ text: '上一篇', key: 'p' }"
         class="group card-lift flex flex-col gap-1 rounded-xl border border-line bg-surface/50 px-4 py-3"
       >
         <span class="inline-flex items-center gap-1 text-[10.5px] text-ink-faint">
@@ -135,6 +137,8 @@ onBeforeUnmount(() => {
       <RouterLink
         v-if="next"
         :to="`/doc/${next.route}`"
+        aria-keyshortcuts="n"
+        v-tooltip="{ text: '下一篇', key: 'n' }"
         class="group card-lift flex flex-col items-end gap-1 rounded-xl border border-line bg-surface/50 px-4 py-3 text-right"
       >
         <span class="inline-flex items-center gap-1 text-[10.5px] text-ink-faint">

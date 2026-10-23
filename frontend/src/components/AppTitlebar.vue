@@ -8,7 +8,7 @@ import { useTheme } from '../composables/useTheme'
 
 const route = useRoute()
 const { state, site } = useCatalog()
-const { resolved, setMode } = useTheme()
+const { resolved, toggleMode } = useTheme()
 
 const routePath = computed(() => {
   const value = route.params.pathMatch
@@ -30,10 +30,7 @@ const context = computed(() => {
 
 const isDark = computed(() => resolved.value === 'dark')
 const themeLabel = computed(() => (isDark.value ? '切换到浅色模式' : '切换到深色模式'))
-
-function toggleTheme() {
-  setMode(isDark.value ? 'light' : 'dark')
-}
+const themeTip = computed(() => ({ text: themeLabel.value, key: 't' }))
 </script>
 
 <template>
@@ -48,7 +45,7 @@ function toggleTheme() {
 
       <span class="h-3.5 w-px shrink-0 bg-line-strong/70" aria-hidden="true" />
 
-      <p class="min-w-0 flex-1 truncate text-[12px] leading-none text-ink-faint" :title="context">
+      <p class="min-w-0 flex-1 truncate text-[12px] leading-none text-ink-faint" v-tooltip="context">
         {{ context }}
       </p>
 
@@ -56,9 +53,10 @@ function toggleTheme() {
         <button
           type="button"
           class="app-titlebar__button"
+          aria-keyshortcuts="t"
           :aria-label="themeLabel"
-          :title="themeLabel"
-          @click="toggleTheme"
+          v-tooltip="themeTip"
+          @click="toggleMode"
         >
           <Sun v-if="isDark" :size="14" />
           <Moon v-else :size="14" />

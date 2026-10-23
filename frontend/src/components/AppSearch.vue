@@ -1,9 +1,10 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Command, Search, X } from '@lucide/vue'
+import { ArrowLeft, Search, X } from '@lucide/vue'
 import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useSearch } from '../composables/useSearch'
+import { isModalBlocked, isTypingTarget } from '../composables/useShortcuts'
 
 const props = defineProps({
   collapsed: { type: Boolean, default: false },
@@ -128,6 +129,28 @@ function scrollActiveIntoView() {
 }
 
 function onInputKeydown(event) {
+  if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault()
+    if (!panelVisible.value) {
+      panelOpen.value = true
+      return
+    }
+    if (!results.value.length) return
+    setActive(event.key === 'Home' ? 0 : results.value.length - 1)
+    scrollActiveIntoView()
+    return
+  }
+
+  if (event.key === 'PageDown' || event.key === 'PageUp') {
+    event.preventDefault()
+    if (!results.value.length) return
+    // 按页翻动固定步长：结果条数不多，5 条刚好对上可视区高度
+    const step = event.key === 'PageDown' ? 5 : -5
+    setActive(Math.min(results.value.length - 1, Math.max(0, activeIndex.value + step)))
+    scrollActiveIntoView()
+    return
+  }
+
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     if (!panelVisible.value) {
@@ -190,16 +213,23 @@ function onDocumentPointerDown(event) {
   panelOpen.value = false
 }
 
-function onGlobalKeydown(event) {
-  if (event.key?.toLowerCase() !== 'k' || event.altKey) return
-  if (!(event.metaKey || event.ctrlKey)) return
-  event.preventDefault()
+function openSearch() {
   if (isDesktop.value) {
     panelOpen.value = true
     focusInput()
   } else {
     expand()
   }
+}
+
+function onGlobalKeydown(event) {
+  // 帮助 / 设置弹窗打开时，搜索不应被唤起
+  if (isModalBlocked()) return
+  // “/” 是搜索的唯一快捷键；焦点在输入框里时交给原生输入，不抢字符
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+  if (isTypingTarget(event.target)) return
+  event.preventDefault()
+  openSearch()
 }
 
 let desktopMedia = null
@@ -264,6 +294,7 @@ watch(
         type="button"
         class="app-search__icon-button"
         aria-label="收起搜索"
+        v-tooltip="'收起搜索'"
         @click.stop="collapse"
       >
         <ArrowLeft :size="17" />
@@ -283,6 +314,7 @@ watch(
         autocapitalize="off"
         spellcheck="false"
         aria-label="搜索文章"
+        aria-keyshortcuts="/"
         @focus="onFocus"
         @blur="onBlur"
         @keydown="onInputKeydown"
@@ -293,15 +325,14 @@ watch(
         class="app-search__spinner"
         aria-hidden="true"
       />
-      <kbd v-else-if="isDesktop" class="app-search__kbd">
-        <Command :size="11" class="app-search__kbd-icon" />K
-      </kbd>
+      <kbd v-else-if="isDesktop" class="app-search__kbd" aria-hidden="true">/</kbd>
 
       <button
         v-if="hasQuery && (isDesktop || expanded)"
         type="button"
         class="app-search__icon-button app-search__clear"
         aria-label="清空搜索"
+        v-tooltip="'清空搜索'"
         @click.stop="clearQuery"
       >
         <X :size="14" />
@@ -323,10 +354,17 @@ watch(
           </span>
           <div v-if="isDesktop && results.length" class="app-search__meta-keys">
             <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+            <span><kbd>Home</kbd><kbd>End</kbd> 首尾</span>
             <span><kbd>Enter</kbd> 打开</span>
             <span><kbd>Esc</kbd> 关闭</span>
           </div>
-          <button type="button" class="app-search__meta-close" aria-label="关闭搜索" @click.stop="closePanel">
+          <button
+            type="button"
+            class="app-search__meta-close"
+            aria-label="关闭搜索"
+            v-tooltip="{ text: '关闭搜索', key: 'Esc' }"
+            @click.stop="closePanel"
+          >
             <X :size="13" />
           </button>
         </div>

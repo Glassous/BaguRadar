@@ -1103,10 +1103,6 @@
   color: var(--c-ink-faint);
 }
 
-.app-search__kbd-icon {
-  stroke-width: 2.2;
-}
-
 .app-search__icon-button {
   display: inline-flex;
   flex-shrink: 0;
@@ -1471,5 +1467,139 @@ pre.search-target {
   100% {
     outline: 2px solid transparent;
     outline-offset: 2px;
+  }
+}
+
+/* ---------- 快捷键面板 ---------- */
+/* 通用键帽：与搜索框里的 .app-search__kbd 同一视觉基准，供帮助面板与设置入口复用 */
+.kbd-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.32rem;
+  padding: 0 0.36rem;
+  border: 1px solid var(--c-line);
+  border-radius: 6px;
+  background: var(--c-surface-2);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--c-line-strong) 55%, transparent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--c-ink-soft);
+  white-space: nowrap;
+  transition:
+    border-color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.34rem 0.5rem;
+  border-radius: 0.55rem;
+  transition: background-color 160ms var(--ease-out);
+}
+
+.shortcuts-row:hover {
+  background: color-mix(in srgb, var(--c-primary) 7%, transparent);
+}
+
+.shortcuts-row:hover .kbd-chip {
+  border-color: color-mix(in srgb, var(--c-primary) 36%, var(--c-line));
+  color: var(--c-primary-ink);
+}
+
+.shortcuts-keys {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 同一次按键里的键帽挨紧，多个候选键位之间用 / 隔开 */
+.shortcuts-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.shortcuts-or {
+  font-size: 9px;
+  line-height: 1;
+  color: var(--c-ink-faint);
+}
+
+@media (max-width: 640px) {
+  .shortcuts-row {
+    padding: 0.42rem 0.5rem;
+  }
+}
+
+/* ---------- 自定义悬停提示 ---------- */
+/* 反色胶囊：深色模式自动变成浅底深字，和原生 title 的观感区分开 */
+.app-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: inline-flex;
+  max-width: min(20rem, calc(100vw - 2rem));
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.52rem;
+  border: 1px solid color-mix(in srgb, var(--c-ink) 18%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--c-ink) 94%, transparent);
+  box-shadow: 0 12px 28px -18px rgb(0 0 0 / 0.6);
+  color: var(--c-canvas);
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 4px;
+  transition:
+    opacity 140ms var(--ease-out),
+    translate 180ms var(--ease-out),
+    visibility 0s linear 140ms;
+}
+
+.app-tooltip[data-side='bottom'] {
+  translate: 0 -4px;
+}
+
+.app-tooltip.is-visible {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+  transition:
+    opacity 120ms var(--ease-out),
+    translate 180ms var(--ease-out);
+}
+
+.app-tooltip__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-tooltip__key {
+  flex-shrink: 0;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c-canvas) 18%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tooltip,
+  .app-tooltip.is-visible {
+    transition-duration: 0ms;
   }
 }

@@ -1,17 +1,25 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Share2 } from '@lucide/vue'
 import AppSearch from './components/AppSearch.vue'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTitlebar from './components/AppTitlebar.vue'
+import ShortcutsDialog from './components/ShortcutsDialog.vue'
 import { useBackClose } from './composables/useBackClose'
 import { useCatalog } from './composables/useCatalog'
+import { openHelp, useShortcuts } from './composables/useShortcuts'
+import { useTheme } from './composables/useTheme'
+import { useToast } from './composables/useToast'
+import { copyText } from './utils/clipboard'
 
 const DESKTOP_QUERY = '(min-width: 1024px)'
 
 const route = useRoute()
+const router = useRouter()
 const { ensureCatalog } = useCatalog()
+const { toggleMode } = useTheme()
+const { toast, showToast } = useToast()
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const searchExpanded = ref(false)
@@ -28,6 +36,12 @@ useBackClose('sidebar', sidebarOpen)
 
 // 移动端搜索展开后，两侧浮动按钮让位（推出屏幕）
 const searchPushed = computed(() => searchExpanded.value && !isDesktopViewport.value)
+
+// 复制链接的快捷键只在文章页注册，提示里的键帽跟着页面变化
+const copyLinkTip = computed(() => ({
+  text: '复制本页链接',
+  key: route.name === 'doc' ? 'c' : '',
+}))
 
 function isDesktop() {
   return desktopMedia.matches
@@ -49,42 +63,44 @@ function toggleSidebar() {
   sidebarOpen.value = true
 }
 
+// 目录聚焦：桌面确保侧栏展开后把焦点交给第一个条目，移动端直接拉起抽屉
+function focusCatalog() {
+  if (!isDesktop()) {
+    sidebarOpen.value = true
+    return
+  }
+  sidebarCollapsed.value = false
+  // 等侧栏位移动画推进一点再聚焦，避免焦点环停在还在滑动的元素上
+  window.setTimeout(() => {
+    document
+      .querySelector('#app-sidebar nav a, #app-sidebar nav button')
+      ?.focus({ preventScroll: true })
+  }, 260)
+}
+
+// 首页章节详情自己处理 Esc，这里不再往上叠一层帮助浮层
+function openShortcutHelp() {
+  if (document.querySelector('[data-overlay="chapter-detail"]')) return
+  openHelp()
+}
+
+// 全站键位：只放跨页面通用的动作，页面内细粒度键位由各视图自行注册
+useShortcuts('global', {
+  '?': () => openShortcutHelp(),
+  '[': () => toggleSidebar(),
+  t: () => toggleMode(),
+  'g h': () => router.push('/'),
+  'g l': () => focusCatalog(),
+})
+
 // 分享入口常驻右上角：点击后只复制当前页面链接
-const shareHint = ref('')
-let shareHintTimer = 0
-
-function showShareHint(message) {
-  shareHint.value = message
-  window.clearTimeout(shareHintTimer)
-  shareHintTimer = window.setTimeout(() => {
-    shareHint.value = ''
-  }, 2000)
-}
-
-// 非安全上下文（无 Clipboard API）时的兜底复制
-function legacyCopy(text) {
-  const area = document.createElement('textarea')
-  area.value = text
-  area.setAttribute('readonly', '')
-  area.style.position = 'fixed'
-  area.style.opacity = '0'
-  document.body.appendChild(area)
-  area.select()
-  const copied = document.execCommand('copy')
-  area.remove()
-  if (!copied) throw new Error('execCommand copy failed')
-}
-
 async function copyPageLink() {
-  const url = window.location.href
-
   try {
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url)
-    else legacyCopy(url)
-    showShareHint('链接已复制')
+    await copyText(window.location.href)
+    showToast('链接已复制')
   } catch (error) {
     console.error('[BaguRadar] 复制链接失败', error)
-    showShareHint('复制失败')
+    showToast('复制失败')
   }
 }
 
@@ -107,7 +123,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   desktopMedia.removeEventListener('change', handleDesktopChange)
-  window.clearTimeout(shareHintTimer)
 })
 </script>
 
@@ -126,6 +141,8 @@ onBeforeUnmount(() => {
       ]"
       aria-label="切换侧栏"
       aria-controls="app-sidebar"
+      aria-keyshortcuts="["
+      v-tooltip="{ text: '切换侧栏', key: '[' }"
       :aria-expanded="!sidebarCollapsed"
       @click="toggleSidebar"
     >
@@ -141,7 +158,8 @@ onBeforeUnmount(() => {
       class="app-float-action fixed right-[calc(0.75rem+var(--safe-right))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-soft transition-[box-shadow,border-color,color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-10"
       :class="searchPushed ? 'pointer-events-none translate-x-[160%] opacity-0' : ''"
       aria-label="复制本页链接"
-      title="复制本页链接"
+      :aria-keyshortcuts="route.name === 'doc' ? 'c' : undefined"
+      v-tooltip="copyLinkTip"
       @click="copyPageLink"
     >
       <Share2 :size="16" />
@@ -160,11 +178,11 @@ onBeforeUnmount(() => {
       leave-to-class="translate-y-1 opacity-0"
     >
       <p
-        v-if="shareHint"
+        v-if="toast"
         role="status"
         class="app-float-hint pointer-events-none fixed right-[calc(0.75rem+var(--safe-right))] z-30 rounded-full border border-line bg-surface/95 px-3 py-1 text-[11px] leading-none text-ink-faint shadow-soft backdrop-blur"
       >
-        {{ shareHint }}
+        {{ toast }}
       </p>
     </Transition>
 
@@ -174,6 +192,8 @@ onBeforeUnmount(() => {
       :collapsed="sidebarCollapsed"
       @close="sidebarOpen = false"
     />
+
+    <ShortcutsDialog />
 
     <main
       ref="mainRef"

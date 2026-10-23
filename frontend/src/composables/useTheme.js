@@ -47,8 +47,13 @@ function setMode(next) {
   }
 }
 
+// 顶栏按钮与 T 快捷键共用：跟随系统时按当前实际主题切到相反的一档
+function toggleMode() {
+  setMode(resolved.value === 'dark' ? 'light' : 'dark')
+}
+
 watch(resolved, applyTheme, { immediate: true })
 
 export function useTheme() {
-  return { mode, resolved, setMode }
+  return { mode, resolved, setMode, toggleMode }
 }

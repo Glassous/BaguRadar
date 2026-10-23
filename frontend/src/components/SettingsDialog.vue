@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Monitor, Moon, Settings2, Sun, X } from '@lucide/vue'
+import { Keyboard, Monitor, Moon, Settings2, Sun, X } from '@lucide/vue'
+import { useShortcuts, openHelp } from '../composables/useShortcuts'
 import { useTheme } from '../composables/useTheme'
 
 const WARM_UP_DURATION = 160
@@ -23,12 +24,34 @@ const options = [
   { value: 'dark', label: '深色', icon: Moon },
 ]
 
-function handleKeydown(event) {
-  if (event.key === 'Escape') emit('close')
+// 模态层：Esc / ? 由快捷键内核统一分发，不再单独挂 document 监听
+useShortcuts(
+  'settings-dialog',
+  {
+    escape: () => emit('close'),
+    '?': () => openShortcuts(),
+  },
+  { priority: 100, modal: true, active: () => props.open },
+)
+
+// 从设置跳到快捷键面板：关闭设置会退掉它压入的历史记录，
+// 必须等 popstate 落地后再打开帮助，否则帮助刚压入的条目会被这次回退一起弹掉。
+function openShortcuts() {
+  emit('close')
+
+  let settled = false
+  const run = () => {
+    if (settled) return
+    settled = true
+    window.removeEventListener('popstate', run)
+    window.clearTimeout(fallback)
+    openHelp()
+  }
+  const fallback = window.setTimeout(run, 180)
+  window.addEventListener('popstate', run, { once: true })
 }
 
 function unlockBody() {
-  document.removeEventListener('keydown', handleKeydown)
   document.body.style.overflow = ''
 }
 
@@ -49,7 +72,6 @@ watch(
   async (isOpen) => {
     if (isOpen) {
       lastFocused = document.activeElement
-      document.addEventListener('keydown', handleKeydown)
       await nextTick()
       // 面板渲染完成后再锁定滚动，避免首帧整页重排拖慢遮罩的模糊采样
       document.body.style.overflow = 'hidden'
@@ -141,13 +163,37 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
+            <p class="mt-5 text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
+              键盘
+            </p>
+
+            <button
+              type="button"
+              class="group mt-3 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-line bg-canvas/50 px-3.5 py-2.5 text-left transition-all duration-200 hover:border-primary/40 hover:bg-surface-2/60"
+              aria-keyshortcuts="?"
+              @click="openShortcuts"
+            >
+              <span
+                class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft transition-colors group-hover:border-primary/35 group-hover:text-primary-ink"
+              >
+                <Keyboard :size="15" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block text-[12.5px] font-medium text-ink">快捷键一览</span>
+                <span class="mt-0.5 block text-[10.5px] text-ink-faint">
+                  搜索、目录、阅读全文按键
+                </span>
+              </span>
+              <kbd class="kbd-chip">?</kbd>
+            </button>
+
             <div class="mt-4 flex items-center justify-between">
               <a
                 href="https://github.com/Glassous/BaguRadar"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="GitHub 仓库"
-                title="GitHub 仓库"
+                v-tooltip="'GitHub 仓库'"
                 class="-ml-1.5 inline-flex size-7 items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" class="size-4" aria-hidden="true">
