@@ -6,6 +6,7 @@ import BrandMark from './BrandMark.vue'
 import SettingsDialog from './SettingsDialog.vue'
 import TreeNode from './TreeNode.vue'
 import StatePanel from './StatePanel.vue'
+import TaffyPeek from './TaffyPeek.vue'
 import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useCatalog } from '../composables/useCatalog'
 import { useInstallApp } from '../composables/useInstallApp'
@@ -378,6 +379,9 @@ ensureCatalog()
         </install>
       </div>
     </aside>
+
+    <!-- 彩蛋挂在 aside 外层：aside 折叠位移会连带 fixed 子元素，这里须独立于其外 -->
+    <TaffyPeek :collapsed="props.collapsed" />
 
     <SettingsDialog :open="settingsOpen" @close="settingsOpen = false" />
   </div>

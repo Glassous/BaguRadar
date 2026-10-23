@@ -102,6 +102,51 @@
   top: calc(var(--titlebar-h) + 4.25rem);
 }
 
+/* ---------- Taffy 探头彩蛋 ----------
+   宿主容器以侧栏右缘为裁剪线（overflow 裁剪），卡片未探出的部分不可见，
+   呈现被侧栏遮挡的效果；侧栏折叠后 left 归零，改为从屏幕左缘探出。
+   停留相位只探出一半（translateX(-50%)），缩头动作在此基础上再退 8%。 */
+.taffy-peek-card {
+  transform: translateX(-104%);
+  animation: taffy-peek 36s cubic-bezier(0.34, 1.2, 0.42, 1) infinite;
+  will-change: transform;
+}
+
+@keyframes taffy-peek {
+  0%,
+  10% {
+    transform: translateX(-104%);
+  }
+
+  /* 探出多半身并停留 */
+  17%,
+  32% {
+    transform: translateX(-40%);
+  }
+
+  /* 缩一下头再探回来 */
+  34%,
+  36% {
+    transform: translateX(-48%);
+  }
+
+  38%,
+  52% {
+    transform: translateX(-40%);
+  }
+
+  60%,
+  100% {
+    transform: translateX(-104%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taffy-peek-host {
+    display: none;
+  }
+}
+
 .app-titlebar {
   display: none;
   position: fixed;

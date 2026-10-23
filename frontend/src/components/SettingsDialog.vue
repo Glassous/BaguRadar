@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Keyboard, LayoutGrid, Monitor, Moon, Radar, Settings2, Sun, X } from '@lucide/vue'
+import { useEasterEgg } from '../composables/useEasterEgg'
 import { useMapView } from '../composables/useMapView'
 import { useShortcuts, openHelp } from '../composables/useShortcuts'
 import { useTheme } from '../composables/useTheme'
@@ -15,6 +16,7 @@ const emit = defineEmits(['close'])
 
 const { mode, setMode } = useTheme()
 const { viewMode, supports3d, setView, redetect } = useMapView()
+const { enabled: easterEgg, setEnabled: setEasterEgg } = useEasterEgg()
 const panelRef = ref(null)
 const backdropRef = ref(null)
 let lastFocused = null
@@ -219,6 +221,29 @@ onBeforeUnmount(() => {
 
             <p class="mt-2 text-[10px] leading-relaxed text-ink-faint">
               首次启动按设备能力自动选定并记住结果，之后不再重复检测。
+            </p>
+
+            <div class="mt-5 flex items-center justify-between gap-3">
+              <p class="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">彩蛋</p>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="easterEgg"
+                aria-label="探头彩蛋"
+                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                :class="easterEgg ? 'border-primary/60 bg-primary' : 'border-line bg-surface-2'"
+                @click="setEasterEgg(!easterEgg)"
+              >
+                <span
+                  aria-hidden="true"
+                  class="absolute top-1/2 left-1 size-4 -translate-y-1/2 rounded-full transition-all duration-200"
+                  :class="easterEgg ? 'translate-x-[20px] bg-canvas' : 'translate-x-0 bg-ink-faint'"
+                />
+              </button>
+            </div>
+
+            <p class="mt-2 text-[10px] leading-relaxed text-ink-faint">
+              Taffy 会时不时从侧栏边缘探出头；关闭后不再出现，可随时再打开。
             </p>
 
             <p class="mt-5 text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
