@@ -1,6 +1,18 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Keyboard, LayoutGrid, Monitor, Moon, Radar, Settings2, Sun, X } from '@lucide/vue'
+import {
+  ChevronRight,
+  Keyboard,
+  LayoutGrid,
+  Monitor,
+  Moon,
+  Radar,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+  Sun,
+  X,
+} from '@lucide/vue'
 import { useEasterEgg } from '../composables/useEasterEgg'
 import { useMapView } from '../composables/useMapView'
 import { useShortcuts, openHelp } from '../composables/useShortcuts'
@@ -139,9 +151,9 @@ onBeforeUnmount(() => {
           aria-modal="true"
           aria-labelledby="settings-title"
           tabindex="-1"
-          class="dialog-card relative max-h-[calc(100dvh-4rem-var(--safe-bottom))] w-full max-w-[360px] overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl outline-none"
+          class="relative flex max-h-[calc(100dvh-4rem-var(--safe-bottom))] w-full max-w-[460px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl outline-none"
         >
-          <div class="flex items-center gap-3 px-5 py-4">
+          <div class="flex shrink-0 items-center gap-3 px-5 py-4">
             <span
               class="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary-soft/60 text-primary-ink"
             >
@@ -149,6 +161,7 @@ onBeforeUnmount(() => {
             </span>
             <div class="min-w-0 flex-1">
               <h2 id="settings-title" class="text-[15px] font-semibold tracking-tight text-ink">设置</h2>
+              <p class="mt-0.5 text-[10.5px] text-ink-faint">外观、地图与交互偏好</p>
             </div>
             <button
               type="button"
@@ -160,133 +173,167 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <div class="px-5 py-5">
-            <p class="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">颜色模式</p>
+          <div class="scroll-area min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <section>
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-faint">外观</p>
+                <span class="font-mono text-[9px] tracking-[0.16em] text-ink-faint/70">Theme</span>
+              </div>
 
-            <div class="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="颜色模式">
-              <button
-                v-for="option in options"
-                :key="option.value"
-                type="button"
-                role="radio"
-                :aria-checked="mode === option.value"
-                class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-2 py-3.5 transition-all duration-200"
-                :class="
-                  mode === option.value
-                    ? 'border-primary/45 bg-primary-soft/40 text-primary-ink'
-                    : 'border-line bg-canvas/50 text-ink-soft hover:border-line-strong hover:bg-surface-2/60'
-                "
-                @click="setMode(option.value)"
+              <div
+                class="mt-2.5 flex gap-1 rounded-xl border border-line bg-canvas-soft p-1"
+                role="radiogroup"
+                aria-label="颜色模式"
               >
-                <component :is="option.icon" :size="17" />
-                <span class="text-[11.5px] font-medium">{{ option.label }}</span>
-              </button>
-            </div>
+                <button
+                  v-for="option in options"
+                  :key="option.value"
+                  type="button"
+                  role="radio"
+                  :aria-checked="mode === option.value"
+                  class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] px-2 py-[7px] text-[12px] font-medium transition-all duration-200"
+                  :class="
+                    mode === option.value
+                      ? 'bg-primary-soft text-primary-ink ring-1 ring-primary/30'
+                      : 'text-ink-soft hover:bg-surface hover:text-ink'
+                  "
+                  @click="setMode(option.value)"
+                >
+                  <component :is="option.icon" :size="14" />
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </section>
 
-            <div class="mt-5 flex items-baseline justify-between gap-2">
-              <p class="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
-                知识地图默认视图
+            <section class="mt-5">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-faint">知识地图</p>
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer items-center gap-1 text-[10px] font-medium text-ink-faint transition-colors hover:text-primary-ink"
+                  v-tooltip="'按当前设备能力重新检测，并覆盖已保存的选择'"
+                  @click="redetect()"
+                >
+                  <RotateCcw :size="10" />
+                  重新检测
+                </button>
+              </div>
+
+              <div
+                class="mt-2.5 flex gap-1 rounded-xl border border-line bg-canvas-soft p-1"
+                role="radiogroup"
+                aria-label="知识地图默认视图"
+              >
+                <button
+                  v-for="option in mapViewOptions"
+                  :key="option.value"
+                  type="button"
+                  role="radio"
+                  :aria-checked="viewMode === option.value"
+                  :disabled="option.value === '3d' && !supports3d"
+                  v-tooltip="mapViewHint(option)"
+                  class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] px-2 py-[7px] text-[12px] font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-soft"
+                  :class="
+                    viewMode === option.value
+                      ? 'bg-primary-soft text-primary-ink ring-1 ring-primary/30'
+                      : 'text-ink-soft hover:bg-surface hover:text-ink'
+                  "
+                  @click="pickMapView(option.value)"
+                >
+                  <component :is="option.icon" :size="14" />
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+
+              <p class="mt-2 pl-0.5 text-[10.5px] leading-relaxed text-ink-faint">
+                首次启动按设备能力自动选定并记住结果，之后不再重复检测。
               </p>
-              <button
-                type="button"
-                class="-mb-0.5 shrink-0 cursor-pointer text-[10px] font-medium text-primary-ink transition-opacity hover:opacity-70"
-                v-tooltip="'按当前设备能力重新检测，并覆盖已保存的选择'"
-                @click="redetect()"
-              >
-                重置
-              </button>
-            </div>
+            </section>
 
-            <div class="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="知识地图默认视图">
-              <button
-                v-for="option in mapViewOptions"
-                :key="option.value"
-                type="button"
-                role="radio"
-                :aria-checked="viewMode === option.value"
-                :disabled="option.value === '3d' && !supports3d"
-                v-tooltip="mapViewHint(option)"
-                class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40"
-                :class="
-                  viewMode === option.value
-                    ? 'border-primary/45 bg-primary-soft/40 text-primary-ink'
-                    : 'border-line bg-canvas/50 text-ink-soft hover:border-line-strong hover:bg-surface-2/60'
-                "
-                @click="pickMapView(option.value)"
-              >
-                <component :is="option.icon" :size="13" />
-                <span class="text-[11.5px] font-medium">{{ option.label }}</span>
-              </button>
-            </div>
+            <section class="mt-5">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-faint">交互</p>
+                <span class="font-mono text-[9px] tracking-[0.16em] text-ink-faint/70">Interaction</span>
+              </div>
 
-            <p class="mt-2 text-[10px] leading-relaxed text-ink-faint">
-              首次启动按设备能力自动选定并记住结果，之后不再重复检测。
-            </p>
+              <div class="mt-2.5 space-y-0.5 rounded-xl border border-line p-1">
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="easterEgg"
+                  aria-label="探头彩蛋"
+                  class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60"
+                  @click="setEasterEgg(!easterEgg)"
+                >
+                  <span
+                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas-soft text-ink-soft"
+                  >
+                    <Sparkles :size="14" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-[12.5px] font-medium text-ink">探头彩蛋</span>
+                    <span class="mt-0.5 block text-[10.5px] leading-relaxed text-ink-faint">
+                      Taffy 时不时从侧栏边缘探出头
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    class="relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full border transition-colors duration-200"
+                    :class="easterEgg ? 'border-primary/60 bg-primary' : 'border-line-strong bg-surface-2'"
+                  >
+                    <span
+                      class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 rounded-full transition-all duration-200"
+                      :class="easterEgg ? 'translate-x-[16px] bg-canvas' : 'translate-x-0 bg-ink-faint'"
+                    />
+                  </span>
+                </button>
 
-            <div class="mt-5 flex items-center justify-between gap-3">
-              <p class="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">彩蛋</p>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="easterEgg"
-                aria-label="探头彩蛋"
-                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                :class="easterEgg ? 'border-primary/60 bg-primary' : 'border-line bg-surface-2'"
-                @click="setEasterEgg(!easterEgg)"
-              >
-                <span
-                  aria-hidden="true"
-                  class="absolute top-1/2 left-1 size-4 -translate-y-1/2 rounded-full transition-all duration-200"
-                  :class="easterEgg ? 'translate-x-[20px] bg-canvas' : 'translate-x-0 bg-ink-faint'"
-                />
-              </button>
-            </div>
-
-            <p class="mt-2 text-[10px] leading-relaxed text-ink-faint">
-              Taffy 会时不时从侧栏边缘探出头；关闭后不再出现，可随时再打开。
-            </p>
-
-            <p class="mt-5 text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
-              键盘
-            </p>
-
-            <button
-              type="button"
-              class="group mt-3 flex w-full cursor-pointer items-center gap-3 rounded-xl border border-line bg-canvas/50 px-3.5 py-2.5 text-left transition-all duration-200 hover:border-primary/40 hover:bg-surface-2/60"
-              aria-keyshortcuts="?"
-              @click="openShortcuts"
-            >
-              <span
-                class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-ink-soft transition-colors group-hover:border-primary/35 group-hover:text-primary-ink"
-              >
-                <Keyboard :size="15" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-[12.5px] font-medium text-ink">快捷键一览</span>
-                <span class="mt-0.5 block text-[10.5px] text-ink-faint">
-                  搜索、目录、阅读全文按键
-                </span>
-              </span>
-              <kbd class="kbd-chip">?</kbd>
-            </button>
-
-            <div class="mt-4 flex items-center justify-between">
-              <a
-                href="https://github.com/Glassous/BaguRadar"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="GitHub 仓库"
-                v-tooltip="'GitHub 仓库'"
-                class="-ml-1.5 inline-flex size-7 items-center justify-center rounded-lg text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" class="size-4" aria-hidden="true">
-                  <path
-                    d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.18-1.49 3.14-1.18 3.14-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"
+                <button
+                  type="button"
+                  class="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60"
+                  aria-keyshortcuts="?"
+                  @click="openShortcuts"
+                >
+                  <span
+                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas-soft text-ink-soft transition-colors group-hover:border-primary/35 group-hover:text-primary-ink"
+                  >
+                    <Keyboard :size="14" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-[12.5px] font-medium text-ink">快捷键一览</span>
+                    <span class="mt-0.5 block text-[10.5px] leading-relaxed text-ink-faint">
+                      搜索、目录、阅读全文按键
+                    </span>
+                  </span>
+                  <kbd class="kbd-chip">?</kbd>
+                  <ChevronRight
+                    :size="13"
+                    class="shrink-0 text-ink-faint transition-transform duration-200 group-hover:translate-x-0.5"
                   />
-                </svg>
-              </a>
-              <span class="text-[10.5px] text-ink-faint">Apache-2.0</span>
-            </div>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div
+            class="flex shrink-0 items-center justify-between gap-3 bg-surface-2/40 px-5 py-2.5"
+          >
+            <a
+              href="https://github.com/Glassous/BaguRadar"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="GitHub 仓库"
+              v-tooltip="'GitHub 仓库'"
+              class="-ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10.5px] font-medium text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="size-3.5" aria-hidden="true">
+                <path
+                  d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.18-1.49 3.14-1.18 3.14-1.18.63 1.58.23 2.75.11 3.04.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"
+                />
+              </svg>
+              GitHub
+            </a>
+            <span class="font-mono text-[10px] tracking-[0.04em] text-ink-faint">Apache-2.0</span>
           </div>
         </div>
       </Transition>
