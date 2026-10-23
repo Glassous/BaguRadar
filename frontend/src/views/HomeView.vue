@@ -1,5 +1,5 @@
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import { Flip } from 'gsap/Flip'
@@ -18,29 +18,70 @@ const OPEN_PROPS = 'fontSize,borderRadius'
 const CLOSE_PROPS = 'fontSize,borderRadius'
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// 3D 知识雷达按需加载：three 体积较大，只在真正需要时拉取
-const KnowledgeRadar = defineAsyncComponent(
-  () => import('../components/knowledge-radar/KnowledgeRadar.vue'),
-)
-
 const DESKTOP_QUERY = '(min-width: 1024px)'
-const supports3d = ref(false)
 
-function detect3d() {
+/** WebGL 能力探测：只建一个临时 context 再归还，不涉及任何 3D 资源。 */
+function hasWebgl() {
   if (typeof window === 'undefined') return false
-  if (!window.matchMedia(DESKTOP_QUERY).matches) return false
   try {
     const canvas = document.createElement('canvas')
     const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
-    return Boolean(gl)
+    const ok = Boolean(gl)
+    // 探测用的上下文立刻归还，避免和真正的渲染器抢 GPU 上下文名额
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    return ok
   } catch (error) {
     console.error('[BaguRadar] WebGL 能力探测失败', error)
     return false
   }
 }
 
-const viewMode = ref('3d')
-const forceList = ref(false)
+/** 低性能设备（少核心 / 小内存）：默认不进 3D，避免首屏就卡住。 */
+function isLowPowerDevice() {
+  if (typeof navigator === 'undefined') return false
+  const cores = navigator.hardwareConcurrency || 8
+  const memory = navigator.deviceMemory || 8
+  return cores <= 4 || memory <= 4
+}
+
+// 切换视图时的占位骨架：与 kr-shell 同高，避免加载完成后页面跳动
+const RadarSkeleton = defineComponent({
+  name: 'RadarSkeleton',
+  render() {
+    return h(
+      'div',
+      {
+        class:
+          'flex h-[520px] w-full items-center justify-center rounded-2xl border border-line bg-surface-2/40 sm:h-[600px] xl:h-[720px]',
+      },
+      [
+        h(
+          'span',
+          { class: 'font-mono text-[11px] tracking-[0.24em] text-ink-faint' },
+          'INITIALIZING RADAR NETWORK',
+        ),
+      ],
+    )
+  },
+})
+
+// 3D 知识雷达按需加载：只有真正渲染雷达视图时才拉取 three 相关代码
+const KnowledgeRadar = defineAsyncComponent({
+  loader: () => import('../components/knowledge-radar/KnowledgeRadar.vue'),
+  delay: 160,
+  timeout: 30000,
+  loadingComponent: RadarSkeleton,
+})
+
+// 首屏策略：桌面 + 有 WebGL + 非低性能才直接进雷达；
+// 手机 / 窄屏 / 无 WebGL / 低性能一律先列表，点“雷达视图”再按需加载 three。
+const supports3d = ref(hasWebgl())
+
+const isDesktop = typeof window !== 'undefined' ? window.matchMedia(DESKTOP_QUERY).matches : false
+const autoRadar = supports3d.value && isDesktop && !isLowPowerDevice()
+
+const viewMode = ref(autoRadar ? '3d' : 'list')
+const forceList = ref(false) // 启动失败后禁用雷达入口
 const radarRef = ref(null)
 const radarError = ref('')
 
@@ -326,7 +367,14 @@ function scrollToMap() {
 
 function switchView(mode) {
   if (mode === viewMode.value) return
-  if (mode === '3d' && forceList.value) return
+  if (mode === '3d') {
+    if (forceList.value) return
+    // 没有 WebGL 的设备直接回绝，绝不下载 three
+    if (!supports3d.value) {
+      radarError.value = '当前设备不支持 WebGL'
+      return
+    }
+  }
   viewMode.value = mode
   if (mode === 'list' && !activeChapter.value) {
     flipAnchor.value = null
@@ -396,8 +444,7 @@ function handleRadarUnsupported(message) {
 }
 
 onMounted(async () => {
-  supports3d.value = detect3d()
-  viewMode.value = supports3d.value ? '3d' : 'list'
+  // 视图模式已在 setup 阶段按能力选好，这里不再重新判定（否则首帧会误挂载 3D 组件）
   document.title = `${site.value.title} · ${site.value.subtitle}`
   // 详情层常驻挂载但初始不可见，保证打开时首帧就已处在 Flip 的起始位置
   gsap.set([overlayRef.value, scrimRef.value], { autoAlpha: 0 })
@@ -520,16 +567,21 @@ onBeforeUnmount(() => {
           <p class="text-[10px] font-medium uppercase tracking-[0.24em] text-ink-faint">Knowledge Map</p>
           <h2 class="mt-2 text-[22px] font-semibold tracking-tight text-ink">知识地图</h2>
           <p v-if="viewMode === '3d'" class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-            16 个章节已布防地形 · 4 类雷达持续扫描 · 点击标签卡片或右上角区域卡片进入
+            16 个章节已布防地形 · 4 类雷达持续扫描 · 点击标签卡片进入
+          </p>
+          <p v-else-if="!supports3d" class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+            当前设备不支持 3D 雷达（WebGL 不可用），已使用列表视图
           </p>
           <p v-else-if="radarError" class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-            3D 雷达不可用（{{ radarError }}），已切换到列表视图
+            3D 雷达启动失败（{{ radarError }}），已切换到列表视图
+          </p>
+          <p v-else class="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
+            {{ chapters.length }} 个章节 · 点击卡片展开小节 · 按 01 → {{ chapters.length }} 顺序通读
           </p>
         </div>
 
         <div
-          v-if="supports3d && !forceList"
-          class="inline-flex items-center gap-1 rounded-xl border border-line bg-surface-2/60 p-1"
+          class="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line bg-surface-2/60 p-1"
           role="tablist"
           aria-label="知识地图视图切换"
         >
@@ -537,7 +589,13 @@ onBeforeUnmount(() => {
             type="button"
             role="tab"
             :aria-selected="viewMode === '3d'"
-            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium transition-colors"
+            :disabled="forceList || !supports3d"
+            :title="
+              forceList || !supports3d
+                ? '当前设备不支持 WebGL，3D 雷达不可用'
+                : '启动 3D 雷达（首次启动时才加载）'
+            "
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             :class="viewMode === '3d' ? 'bg-surface text-ink shadow-soft' : 'text-ink-faint hover:text-ink'"
             @click="switchView('3d')"
           >
@@ -578,7 +636,7 @@ onBeforeUnmount(() => {
 
       <div v-else class="mt-6">
         <KnowledgeRadar
-          v-if="viewMode === '3d'"
+          v-if="viewMode === '3d' && !forceList"
           ref="radarRef"
           :chapters="chapters"
           @select="handleRadarSelect"

@@ -633,6 +633,30 @@
   }
 }
 
+/* 小屏（手机）：3D 仍可手动开启，但只保留必要 HUD，避免叠满整屏 */
+@media (max-width: 640px) {
+  .kr-zones,
+  .kr-hud--bc,
+  .kr-hud--br {
+    display: none;
+  }
+  .kr-hud--tl {
+    top: 10px;
+    left: 12px;
+  }
+  .kr-hud--tr {
+    top: 10px;
+    right: 12px;
+  }
+  .kr-title {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
+  .kr-stats strong {
+    font-size: 17px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kr-scanbar,
   .kr-log__entry,
