@@ -975,6 +975,11 @@
   right: calc(var(--safe-right) + 0.75rem);
 }
 
+/* 首帧不做位移动画：刷新后搜索框本来就在它的位置上 */
+.app-search:not(.app-search--ready) {
+  transition: none;
+}
+
 @media (min-width: 1024px) {
   .app-search--desktop {
     left: var(--search-left, 3.75rem);
@@ -1013,6 +1018,7 @@
 
 .app-search--collapsed .app-search__bar {
   justify-content: center;
+  gap: 0;
   padding: 0;
   cursor: pointer;
 }
@@ -1026,8 +1032,22 @@
 
 .app-search__icon {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
   color: var(--c-ink-faint);
-  transition: color 200ms var(--ease-out);
+  transition:
+    color 200ms var(--ease-out),
+    width 200ms var(--ease-out),
+    height 200ms var(--ease-out);
+}
+
+/* 收起态是圆形按钮，图标要比长条里更粗更大，才和两侧浮动按钮同重量 */
+.app-search--collapsed .app-search__icon {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2.4;
+  color: var(--c-ink-soft);
 }
 
 .app-search__bar.is-focused .app-search__icon {
@@ -1069,7 +1089,10 @@
 }
 
 .app-search__kbd {
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 1px;
   padding: 0.18rem 0.4rem;
   border: 1px solid var(--c-line);
   border-radius: 6px;
@@ -1078,6 +1101,10 @@
   font-size: 9.5px;
   line-height: 1;
   color: var(--c-ink-faint);
+}
+
+.app-search__kbd-icon {
+  stroke-width: 2.2;
 }
 
 .app-search__icon-button {
@@ -1198,10 +1225,33 @@
 }
 
 .app-search__meta-text {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 快捷键提示与“找到 N 篇”同一行，靠右对齐 */
+.app-search__meta-keys {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.7rem;
+  margin-left: auto;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--c-ink-faint);
+}
+
+.app-search__meta-keys kbd {
+  margin-right: 2px;
+  padding: 0.12rem 0.28rem;
+  border: 1px solid var(--c-line);
+  border-radius: 4px;
+  background: var(--c-surface-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
 }
 
 .app-search__meta-text strong {
@@ -1225,7 +1275,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  margin-left: auto;
+  margin-left: 0.1rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -1243,6 +1293,7 @@
   }
 }
 
+/* 滚动条交给 v-scrollbar（与主区域 / 侧栏同一套悬浮样式） */
 .app-search__list {
   flex: 1 1 auto;
   min-height: 0;
@@ -1251,17 +1302,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   list-style: none;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--c-ink-faint) 26%, transparent) transparent;
-}
-
-.app-search__list::-webkit-scrollbar {
-  width: 5px;
-}
-
-.app-search__list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--c-ink-faint) 26%, transparent);
 }
 
 .app-search__item {
@@ -1344,27 +1384,6 @@
 
 .app-search__ellipsis {
   color: var(--c-ink-faint);
-}
-
-.app-search__footer {
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.9rem;
-  padding: 0.42rem 0.9rem;
-  border-top: 1px solid var(--c-line);
-  font-size: 10px;
-  line-height: 1;
-  color: var(--c-ink-faint);
-}
-
-.app-search__footer kbd {
-  margin-right: 2px;
-  padding: 0.12rem 0.28rem;
-  border: 1px solid var(--c-line);
-  border-radius: 4px;
-  background: var(--c-surface-2);
-  font-family: var(--font-mono);
-  font-size: 9px;
 }
 
 .app-search__state {

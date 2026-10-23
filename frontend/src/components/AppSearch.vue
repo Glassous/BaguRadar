@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Search, X } from '@lucide/vue'
+import { ArrowLeft, Command, Search, X } from '@lucide/vue'
 import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useSearch } from '../composables/useSearch'
 
@@ -15,9 +15,11 @@ const route = useRoute()
 const router = useRouter()
 const rootRef = ref(null)
 const inputRef = ref(null)
-const isDesktop = ref(false)
+// 首帧就按真实断点渲染，避免挂载后从移动端样式切到桌面端而产生“飞入”动画
+const isDesktop = ref(window.matchMedia(desktopQuery).matches)
 const focused = ref(false)
 const panelOpen = ref(false)
+const ready = ref(false)
 
 const expanded = defineModel('expanded', { type: Boolean, default: false })
 
@@ -25,7 +27,6 @@ const {
   query,
   results,
   total,
-  took,
   pending,
   error,
   empty,
@@ -40,22 +41,18 @@ const placeholder = computed(() =>
   isDesktop.value ? '搜索文章 / 关键词' : '搜索文章或关键词',
 )
 
-const shortcut = computed(() => {
-  const platform = navigator.userAgentData?.platform || navigator.platform || ''
-  return /mac/i.test(platform) ? '⌘K' : 'Ctrl K'
+const panelVisible = computed(() => {
+  if (isDesktop.value) return panelOpen.value && (hasQuery.value || pending.value)
+  // 移动端展开后先只露出输入框，等真正有查询或结果再铺开面板
+  return expanded.value && (hasQuery.value || pending.value || results.value.length > 0)
 })
-
-const panelVisible = computed(() =>
-  isDesktop.value ? panelOpen.value && (hasQuery.value || pending.value) : expanded.value,
-)
-
-const showHint = computed(() => !hasQuery.value && !pending.value && !error.value)
 
 const rootClass = computed(() => ({
   'app-search--desktop': isDesktop.value,
   'app-search--expanded': expanded.value,
   'app-search--collapsed': !isDesktop.value && !expanded.value,
   'app-search--panel': panelVisible.value,
+  'app-search--ready': ready.value,
 }))
 
 // 侧栏展开时搜索条跟随浮动按钮右移（桌面端）
@@ -95,6 +92,11 @@ function collapse() {
 }
 
 function closePanel() {
+  // 移动端的面板依附于展开态，关闭按钮直接收起整条搜索
+  if (!isDesktop.value && expanded.value) {
+    collapse()
+    return
+  }
   panelOpen.value = false
   focused.value = false
   inputRef.value?.blur()
@@ -221,6 +223,10 @@ onMounted(() => {
   desktopMedia.addEventListener('change', handleDesktopChange)
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
   window.addEventListener('keydown', onGlobalKeydown)
+  // 首帧完成定位后再启用位移动画，刷新时搜索框不会从别处滑入
+  nextTick(() => {
+    ready.value = true
+  })
 })
 
 onBeforeUnmount(() => {
@@ -246,7 +252,7 @@ watch(
 <template>
   <div ref="rootRef" class="app-search" :class="rootClass" :style="rootStyle" @click="onContainerClick">
     <div
-      v-if="!isDesktop && expanded"
+      v-if="!isDesktop && panelVisible"
       class="app-search__scrim"
       aria-hidden="true"
       @click.stop="collapse"
@@ -282,8 +288,14 @@ watch(
         @keydown="onInputKeydown"
       />
 
-      <span v-if="pending" class="app-search__spinner" aria-hidden="true" />
-      <kbd v-else-if="isDesktop" class="app-search__kbd">{{ shortcut }}</kbd>
+      <span
+        v-if="pending && (isDesktop || expanded)"
+        class="app-search__spinner"
+        aria-hidden="true"
+      />
+      <kbd v-else-if="isDesktop" class="app-search__kbd">
+        <Command :size="11" class="app-search__kbd-icon" />K
+      </kbd>
 
       <button
         v-if="hasQuery && (isDesktop || expanded)"
@@ -303,13 +315,17 @@ watch(
           <span v-else-if="error" class="app-search__meta-text app-search__meta-text--error">
             搜索服务暂不可用
           </span>
-          <span v-else-if="showHint" class="app-search__meta-text">输入关键词，检索标题与正文</span>
           <span v-else-if="empty" class="app-search__meta-text">
             没有找到「{{ query.trim() }}」相关文章
           </span>
           <span v-else class="app-search__meta-text">
-            找到 <strong>{{ total }}</strong> 篇 · {{ took }} ms
+            找到 <strong>{{ total }}</strong> 篇
           </span>
+          <div v-if="isDesktop && results.length" class="app-search__meta-keys">
+            <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+            <span><kbd>Enter</kbd> 打开</span>
+            <span><kbd>Esc</kbd> 关闭</span>
+          </div>
           <button type="button" class="app-search__meta-close" aria-label="关闭搜索" @click.stop="closePanel">
             <X :size="13" />
           </button>
@@ -318,13 +334,6 @@ watch(
         <div v-if="error" class="app-search__state">
           <p class="app-search__state-title">搜索服务连接失败</p>
           <p class="app-search__state-text">{{ error }}，可先用侧栏目录浏览，稍后再试。</p>
-        </div>
-
-        <div v-else-if="showHint" class="app-search__state">
-          <p class="app-search__state-title">随打即搜</p>
-          <p class="app-search__state-text">
-            支持中文、英文与多关键词（空格分隔），在标题、标签、正文与代码块中检索。
-          </p>
         </div>
 
         <div v-else-if="empty" class="app-search__state">
@@ -336,7 +345,7 @@ watch(
           <span v-for="index in 4" :key="index" class="app-search__skeleton" />
         </div>
 
-        <ul v-else class="app-search__list" role="listbox" aria-label="匹配文章">
+        <ul v-else v-scrollbar class="app-search__list" role="listbox" aria-label="匹配文章">
           <li v-for="(item, index) in results" :key="item.route">
             <button
               type="button"
@@ -362,12 +371,6 @@ watch(
             </button>
           </li>
         </ul>
-
-        <div v-if="isDesktop && results.length" class="app-search__footer">
-          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
-          <span><kbd>Enter</kbd> 打开</span>
-          <span><kbd>Esc</kbd> 关闭</span>
-        </div>
       </div>
     </Transition>
   </div>

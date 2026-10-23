@@ -37,6 +37,19 @@ function routeOfPath(relativePath) {
   return normalizeRelPath(relativePath).replace(/\.md$/i, '')
 }
 
+// 生产内容镜像只有 manifest.json 与 docs/；本地调试指向仓库根时也优先只扫 docs/，
+// 避免把仓库里其他被忽略的 Markdown（如 .agents/）当文章索引。
+async function resolveDocsDir(root) {
+  const candidate = path.join(root, 'docs')
+  try {
+    const stat = await fsp.stat(candidate)
+    if (stat.isDirectory()) return candidate
+  } catch {
+    // 目录不存在时回退到根目录
+  }
+  return root
+}
+
 async function listMarkdown(dir, root, output = []) {
   let entries
   try {
@@ -149,7 +162,8 @@ async function buildSnapshot(root) {
   const started = performance.now()
   const manifest = await readManifest(root)
   const byPath = manifestIndex(manifest)
-  const files = await listMarkdown(root, root)
+  const docsDir = await resolveDocsDir(root)
+  const files = await listMarkdown(docsDir, root)
 
   const docs = []
   let bytes = 0
@@ -253,7 +267,7 @@ export function createIndexer({
   async function poll() {
     if (closed || building) return
     try {
-      const stats = await fsp.stat(path.join(root, 'docs'))
+      const stats = await fsp.stat(root)
       if (!stats.isDirectory()) return
     } catch {
       return
@@ -267,7 +281,7 @@ export function createIndexer({
       manifestStamp = 'missing'
     }
 
-    const files = await listMarkdown(root, root)
+    const files = await listMarkdown(await resolveDocsDir(root), root)
     const fingerprint = files
       .map((entry) => `${entry.relative}:${Math.round(entry.mtimeMs)}:${entry.size}`)
       .sort()
