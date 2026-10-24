@@ -63,7 +63,7 @@ function collectMaterials(group) {
  * 构建 16 个章节目标 + 杂波假目标。
  * 返回 { group, targets, noise, update(elapsed), dispose() }
  */
-export function createTargets(resolved) {
+export function createTargets(resolved, { reduceMotion = false } = {}) {
   const group = new THREE.Group()
   group.name = 'targets'
 
@@ -72,17 +72,17 @@ export function createTargets(resolved) {
   for (const [index, config] of resolved.entries()) {
     // 落在体素柱顶面（向上取整后的高度），保证载具贴合地形而不是悬空；
     // 峡谷章节位于海平面以下的谷底，不能钳到 SEA_LEVEL，否则会浮在空中
-    const baseY =
-      config.zone === 'sky' || config.zone === 'sea'
-        ? SEA_LEVEL + config.lift
-        : terrainSurfaceHeight(config.x, config.z) + config.lift
+    const baseY = ['air', 'sea'].includes(config.domain)
+      ? SEA_LEVEL + config.lift
+      : terrainSurfaceHeight(config.x, config.z) + config.lift
 
     const holder = new THREE.Group()
     holder.position.set(config.x, baseY, config.z)
-    holder.rotation.y = Math.random() * Math.PI * 2
+    holder.rotation.y = config.rotation || 0
 
     const model = buildChapterModel(config.model, config.accent)
-    model.scale.setScalar(config.scale)
+    const renderScale = config.scale * 1.18
+    model.scale.setScalar(renderScale)
     holder.add(model)
 
     // 依据体素载体的实际尺寸布置锁定环、悬浮标记与标签锚点
@@ -101,8 +101,7 @@ export function createTargets(resolved) {
     holder.add(marker)
 
     const labelAnchor = new THREE.Object3D()
-    // 错开标签高度，减少主峰区多个标签在屏幕上互相压叠
-    labelAnchor.position.y = modelHeight + 3 + (index % 4) * 2.6
+    labelAnchor.position.y = modelHeight + 2.2 + (index % 3) * 0.7
     holder.add(labelAnchor)
 
     const materials = collectMaterials(model)
@@ -115,6 +114,7 @@ export function createTargets(resolved) {
       docCount: config.docCount,
       holder,
       model,
+      renderScale,
       materials,
       marker,
       markerBaseY: marker.position.y,
@@ -123,6 +123,7 @@ export function createTargets(resolved) {
       locked: false,
       revealed: !stealth,
       stealth,
+      spinners: model.userData.spinners || [],
       pulseTween: null,
       get worldPosition() {
         return holder.position
@@ -160,6 +161,7 @@ export function createTargets(resolved) {
       holder,
       mesh,
       materials: collectMaterials(mesh),
+      baseScale: config.scale,
       triggeredAt: 0,
       pulseTween: null,
     })
@@ -170,25 +172,25 @@ export function createTargets(resolved) {
     target.locked = true
     target.marker.visible = true
 
-    if (!silent) {
+    if (!silent && !reduceMotion) {
       gsap.fromTo(
         target.lockRing.material,
         { opacity: 0 },
-        { opacity: 0.85, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' },
+        { opacity: 0.85, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out', overwrite: 'auto' },
       )
       gsap.fromTo(
         target.lockRing.scale,
         { x: 2.6, y: 2.6, z: 2.6 },
-        { x: 1, y: 1, z: 1, duration: 0.6, ease: 'power3.out' },
+        { x: 1, y: 1, z: 1, duration: 0.6, ease: 'power3.out', overwrite: 'auto' },
       )
       target.pulseTween?.kill()
       target.pulseTween = gsap
         .timeline()
         .to(target.model.scale, { x: 0.86, y: 0.86, z: 0.86, duration: 0.12, ease: 'power2.in' })
         .to(target.model.scale, {
-          x: target.config.scale,
-          y: target.config.scale,
-          z: target.config.scale,
+          x: target.renderScale,
+          y: target.renderScale,
+          z: target.renderScale,
           duration: 0.5,
           ease: 'elastic.out(1, 0.4)',
         })
@@ -222,18 +224,21 @@ export function createTargets(resolved) {
     for (const material of target.materials) {
       gsap.to(material, {
         opacity: material.userData.baseOpacity ?? 0.9,
-        duration: silent ? 0 : 0.9,
+        duration: silent || reduceMotion ? 0 : 0.9,
         ease: 'power2.out',
+        overwrite: 'auto',
         onComplete: () => {
           material.depthWrite = true
         },
       })
     }
-    gsap.fromTo(
-      target.lockRing.material,
-      { opacity: 0.9 },
-      { opacity: 0.35, duration: 1.4, repeat: 2, yoyo: true },
-    )
+    if (!reduceMotion) {
+      gsap.fromTo(
+        target.lockRing.material,
+        { opacity: 0.9 },
+        { opacity: 0.35, duration: 1.4, repeat: 2, yoyo: true, overwrite: 'auto' },
+      )
+    }
     lock(target, { silent })
     return true
   }
@@ -243,26 +248,44 @@ export function createTargets(resolved) {
     if (now - item.triggeredAt < 9000) return false
     item.triggeredAt = now
     item.pulseTween?.kill()
-    item.pulseTween = gsap
-      .timeline()
-      .to(item.mesh.scale, { x: 1.4, y: 1.4, z: 1.4, duration: 0.14, ease: 'power2.out' })
-      .to(item.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.4, ease: 'power2.inOut' })
-    for (const material of item.materials) {
-      if (!material.emissive) continue
-      gsap.fromTo(
-        material,
-        { emissiveIntensity: 1.8 },
-        { emissiveIntensity: material.userData.baseIntensity ?? 0.5, duration: 0.7 },
-      )
+    if (!reduceMotion) {
+      const peak = item.baseScale * 1.4
+      item.pulseTween = gsap
+        .timeline()
+        .to(item.mesh.scale, { x: peak, y: peak, z: peak, duration: 0.14, ease: 'power2.out' })
+        .to(item.mesh.scale, { x: item.baseScale, y: item.baseScale, z: item.baseScale, duration: 0.4, ease: 'power2.inOut' })
+      for (const material of item.materials) {
+        if (!material.emissive) continue
+        gsap.fromTo(
+          material,
+          { emissiveIntensity: 1.8 },
+          { emissiveIntensity: material.userData.baseIntensity ?? 0.5, duration: 0.7, overwrite: 'auto' },
+        )
+      }
     }
     return true
   }
 
-  function update(elapsed) {
+  function setHover(id) {
     for (const target of targets) {
+      const hovered = target.id === id
+      if (target.hovered === hovered) continue
+      target.hovered = hovered
+      for (const material of target.materials) {
+        if (!material.emissive || (target.stealth && !target.revealed)) continue
+        material.emissive.setHex(hovered ? target.config.accent : material.userData.baseEmissive || 0x000000)
+        material.emissiveIntensity = hovered ? 0.24 : material.userData.baseIntensity || 0
+      }
+    }
+  }
+
+  function update(elapsed) {
+    const motionScale = reduceMotion ? 0.15 : 1
+    for (const target of targets) {
+      for (const spinner of target.spinners) spinner.object.rotation[spinner.axis] = elapsed * spinner.speed * motionScale
       if (target.marker.visible) {
-        target.marker.rotation.y = elapsed * 1.4
-        target.marker.position.y = target.markerBaseY + Math.sin(elapsed * 2 + target.config.x) * 0.16
+        target.marker.rotation.y = elapsed * 1.4 * motionScale
+        target.marker.position.y = target.markerBaseY + Math.sin(elapsed * 2 * motionScale + target.config.x) * 0.16
       }
     }
     for (const target of targets) {
@@ -279,6 +302,9 @@ export function createTargets(resolved) {
   function dispose() {
     for (const target of targets) {
       target.pulseTween?.kill()
+      gsap.killTweensOf(target.model.scale)
+      gsap.killTweensOf(target.lockRing.scale)
+      gsap.killTweensOf(target.lockRing.material)
       for (const material of target.materials) {
         gsap.killTweensOf(material)
         gsap.killTweensOf(material.emissive)
@@ -286,6 +312,7 @@ export function createTargets(resolved) {
     }
     for (const item of noise) {
       item.pulseTween?.kill()
+      gsap.killTweensOf(item.mesh.scale)
       for (const material of item.materials) gsap.killTweensOf(material)
     }
     gsap.killTweensOf(group.children)
@@ -297,5 +324,5 @@ export function createTargets(resolved) {
     group.clear()
   }
 
-  return { group, targets, noise, lock, revealStealth, pulseNoise, update, dispose }
+  return { group, targets, noise, lock, revealStealth, pulseNoise, setHover, update, dispose }
 }

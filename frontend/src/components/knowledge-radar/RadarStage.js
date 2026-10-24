@@ -12,10 +12,10 @@ const SCOPE_MAX = 78
 
 // 整体放大比例：地形/目标/雷达统一挂到 this.world 下缩放，
 // 相机位置保持在同一量级即可获得“地图更大 + 初始更近”的观感。
-const WORLD_SCALE = 1.25
+const WORLD_SCALE = 1.1
 
-const HOME_POSITION = new THREE.Vector3(92, 145, 112)
-const HOME_TARGET = new THREE.Vector3(0, 6, 0)
+const HOME_POSITION = new THREE.Vector3(105, 126, 128)
+const HOME_TARGET = new THREE.Vector3(0, 7, 0)
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value))
@@ -52,13 +52,14 @@ export class RadarStage {
     this.terrain = createTerrain()
     this.world.add(this.terrain.group)
 
-    this.targetSystem = createTargets(targets)
+    this.targetSystem = createTargets(targets, { reduceMotion: this.reduceMotion })
     this.world.add(this.targetSystem.group)
 
     this.radarSystem = createRadars({
       onLock: (target) => this.handleLock(target),
       onNoise: (item) => this.handleNoise(item),
       onRevealStealth: (target) => this.handleReveal(target),
+      reduceMotion: this.reduceMotion,
     })
     this.radarSystem.bind({
       targets: this.targetSystem.targets,
@@ -86,9 +87,10 @@ export class RadarStage {
       powerPreference: 'high-performance',
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.9))
-    this.renderer.setClearColor(0x0a2f3a, 1)
+    this.renderer.setClearColor(0x07151d, 1)
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.12
+    this.renderer.toneMappingExposure = 1.28
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
 
     this.labelRenderer = new CSS2DRenderer({ element: this.labelLayer })
     this.labelRenderer.domElement.style.position = 'absolute'
@@ -99,9 +101,9 @@ export class RadarStage {
   setupScene() {
     this.scene = new THREE.Scene()
     // 海雾色与远处海面、天空地平线统一，远景淡出到海雾而不是露出黑色虚空
-    const horizonColor = new THREE.Color(0x0a2f3a)
+    const horizonColor = new THREE.Color(0x07151d)
     this.scene.background = horizonColor.clone()
-    this.scene.fog = new THREE.FogExp2(horizonColor.clone(), 0.0022)
+    this.scene.fog = new THREE.FogExp2(horizonColor.clone(), 0.0025)
     this.scene.add(this.createSkyDome(horizonColor))
 
     // 所有世界内容统一缩放，便于整体“把地图做大”而不改动任何坐标公式
@@ -109,19 +111,18 @@ export class RadarStage {
     this.world.scale.setScalar(WORLD_SCALE)
     this.scene.add(this.world)
 
-    const hemi = new THREE.HemisphereLight(0x53f2d5, 0x04120f, 0.46)
+    const hemi = new THREE.HemisphereLight(0xb9e4e2, 0x07151d, 1.15)
     this.scene.add(hemi)
 
-    const key = new THREE.DirectionalLight(0x9af8e4, 1.2)
-    key.position.set(64, 92, 46)
+    const key = new THREE.DirectionalLight(0xffedcf, 2.4)
+    key.position.set(64, 110, 72)
     this.scene.add(key)
 
-    const rim = new THREE.DirectionalLight(0x2b6bff, 0.42)
+    const rim = new THREE.DirectionalLight(0x5aa9e6, 1.05)
     rim.position.set(-70, 48, -60)
     this.scene.add(rim)
 
-    // 面向默认机位的补光，避免目标在雾中变成纯黑剪影
-    const fill = new THREE.DirectionalLight(0x9fe8ff, 0.5)
+    const fill = new THREE.DirectionalLight(0x9fe8ff, 0.8)
     fill.position.set(70, 45, 110)
     this.scene.add(fill)
 
@@ -221,7 +222,7 @@ export class RadarStage {
       el.dataset.state = 'idle'
       el.style.setProperty('--zone-color', ZONES[target.config.zone]?.color || '#5eead4')
       el.innerHTML = `
-        <span class="radar-label__zone">${ZONES[target.config.zone]?.en || ''}</span>
+        <span class="radar-label__zone">${target.config.typeName}</span>
         <span class="radar-label__title">${target.title}</span>
         <span class="radar-label__meta">${this.labelMeta(target)}</span>
       `
@@ -237,6 +238,7 @@ export class RadarStage {
         object,
         el,
         target,
+        typeEl: el.querySelector('.radar-label__zone'),
         titleEl: el.querySelector('.radar-label__title'),
         metaEl: el.querySelector('.radar-label__meta'),
       })
@@ -281,6 +283,8 @@ export class RadarStage {
       )
 
       const title = masked ? '未知信号' : target.title
+      const typeName = masked ? '未识别回波' : target.config.typeName
+      if (item.typeEl.textContent !== typeName) item.typeEl.textContent = typeName
       if (item.titleEl.textContent !== title) item.titleEl.textContent = title
       const meta = this.labelMeta(target)
       if (item.metaEl.textContent !== meta) item.metaEl.textContent = meta
@@ -358,13 +362,13 @@ export class RadarStage {
       const result = chosen || fallback
       if (!result) {
         entry.item.shift = 0
-        entry.item.el.style.marginTop = '0px'
+        entry.item.el.style.translate = '0 0px'
         entry.item.el.style.setProperty('--leader', '0px')
         entry.item.el.classList.remove('is-below')
         continue
       }
       entry.item.shift = result.shift
-      entry.item.el.style.marginTop = `${result.shift}px`
+      entry.item.el.style.translate = `0 ${result.shift}px`
       entry.item.el.style.setProperty('--leader', `${Math.abs(result.shift)}px`)
       entry.item.el.classList.toggle('is-below', result.shift > 0)
       placed.push(result.rect)
@@ -388,6 +392,7 @@ export class RadarStage {
       if (this.hoverId) {
         const prev = this.hoverId
         this.hoverId = null
+        this.targetSystem.setHover(null)
         this.refreshLabelById(prev)
         this.callbacks.onHover?.(null)
       }
@@ -475,6 +480,7 @@ export class RadarStage {
     if (nextId !== this.hoverId) {
       const prev = this.hoverId
       this.hoverId = nextId
+      this.targetSystem.setHover(nextId)
       if (prev) this.refreshLabelById(prev)
       if (nextId) this.refreshLabelById(nextId)
       this.canvas.style.cursor = nextId ? 'pointer' : 'grab'
@@ -527,7 +533,7 @@ export class RadarStage {
   // -------------------------------------------------------------------------
   focusOn(target) {
     const position = this.worldPositionOf(target)
-    const isSky = target.config.zone === 'sky'
+    const isSky = target.config.domain === 'air'
     const distance = (isSky ? 42 : 34) * WORLD_SCALE
     const direction = new THREE.Vector3(0.72, isSky ? 0.32 : 0.56, 0.72).normalize()
     const dest = position

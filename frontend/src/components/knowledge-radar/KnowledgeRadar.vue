@@ -25,6 +25,7 @@ const logs = ref([])
 
 let alertTimer = 0
 let bootTimer = 0
+const bootTimers = []
 let visibilityHandler = null
 let intersectionObserver = null
 let elapsed = 0
@@ -45,10 +46,10 @@ const seaRingR = computed(() => Math.min(72, ((snapshot.value?.seaRadius || 0) /
 const lowRingR = computed(() => Math.min(72, ((snapshot.value?.lowRadius || 0) / 30) * 72))
 
 const bootLog = [
-  '中央主控雷达 · 上线',
-  '海上相控阵 · 同步完成',
-  '峡谷低空阵列 · 待命',
-  'AEW&C 预警机 · 已进入航线',
+  '地面搜索阵列 · 上线',
+  '海面扫描阵列 · 同步完成',
+  '低空监视网络 · 待命',
+  '空中扫描节点 · 已进入航线',
 ]
 
 function pushLog(text, kind = 'info') {
@@ -148,7 +149,7 @@ onMounted(async () => {
       })
       booting.value = false
       bootLog.forEach((text, index) => {
-        window.setTimeout(() => pushLog(text, 'info'), index * 220)
+        bootTimers.push(window.setTimeout(() => pushLog(text, 'info'), index * 220))
       })
 
       visibilityHandler = () => {
@@ -179,6 +180,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.clearTimeout(alertTimer)
   window.clearTimeout(bootTimer)
+  bootTimers.forEach((timer) => window.clearTimeout(timer))
   if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler)
   intersectionObserver?.disconnect()
   stage.value?.dispose()
@@ -207,8 +209,8 @@ defineExpose({
     </div>
 
     <div class="kr-hud kr-hud--tl">
-      <p class="kr-title">TACTICAL KNOWLEDGE GRID</p>
-      <p class="kr-subtitle">BAGURADAR · 16 SECTORS / LIVE SCAN</p>
+      <p class="kr-title">全域目标态势沙盘</p>
+      <p class="kr-subtitle">BAGURADAR · AIR / LAND / SEA · LIVE SCAN</p>
       <p class="kr-stats">
         <strong>{{ String(lockedCount).padStart(2, '0') }}</strong>
         <span>/ {{ String(totalCount).padStart(2, '0') }} 目标已锁定</span>
