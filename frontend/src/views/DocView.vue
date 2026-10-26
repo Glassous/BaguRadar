@@ -3,7 +3,9 @@ import { inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ArticleToc from '../components/ArticleToc.vue'
 import ArticleView from '../components/ArticleView.vue'
+import AdSlot from '../components/AdSlot.vue'
 import StatePanel from '../components/StatePanel.vue'
+import { useAds } from '../composables/useAds'
 import { useCatalog } from '../composables/useCatalog'
 import { useReadingPosition } from '../composables/useReadingPosition'
 import { useShortcuts } from '../composables/useShortcuts'
@@ -24,6 +26,8 @@ const route = useRoute()
 const router = useRouter()
 const { showToast } = useToast()
 const { state, ensureCatalog, getDocByRoute, getNeighbors } = useCatalog()
+// 广告位只在右侧目录下方的空位里出现，关闭后卡片和留白一起收回
+const { enabled: adsEnabled } = useAds()
 const { lastPosition, saveReadingPosition } = useReadingPosition()
 // 正文滚动发生在外层的 main 容器上，由 App 注入，缺失时回退到类名查找
 const scrollRoot = inject('appScrollEl', null)
@@ -367,9 +371,9 @@ watch(() => route.fullPath, load, { immediate: true })
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1240px] gap-10 px-4 pb-6 pt-8 sm:px-6 lg:pt-14 xl:px-8">
+  <div class="mx-auto flex w-full max-w-[1440px] gap-10 px-4 pb-6 pt-8 sm:px-6 lg:pt-14 xl:px-8">
     <div class="min-w-0 flex-1">
-      <div v-if="loading" class="mx-auto w-full max-w-[860px]">
+      <div v-if="loading" class="mx-auto w-full max-w-[1000px]">
         <StatePanel variant="loading" :lines="12" />
       </div>
 
@@ -408,9 +412,13 @@ watch(() => route.fullPath, load, { immediate: true })
       />
     </div>
 
-    <aside v-if="!loading && !error && doc" class="hidden w-[218px] shrink-0 xl:block">
-      <div class="sticky top-6 pb-6">
+    <aside
+      v-if="!loading && !error && doc"
+      class="article-toc-aside hidden w-[218px] shrink-0 xl:block"
+    >
+      <div class="sticky top-6 pb-6" :class="{ 'doc-aside-stack': adsEnabled }">
         <ArticleToc :toc="toc" />
+        <AdSlot v-if="adsEnabled" class="mt-4" />
       </div>
     </aside>
   </div>

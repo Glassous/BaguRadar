@@ -1101,6 +1101,122 @@ body > .mermaidTooltip {
   background: var(--c-primary);
 }
 
+/* ---------- 文章目录：竖屏 / 窄屏改为顶部横向滑动 ----------
+   三种形态互斥：
+   - 竖屏或 <1024px：顶部横向章节条（.article-toc-rail）
+   - 1024–1279px 且横屏：折叠面板（.article-toc-inline），顶栏位置留给左上角浮动按钮
+   - 横屏 ≥1280px：右侧竖排目录（.article-toc-aside） */
+.article-toc-rail {
+  display: none;
+  margin: 1.5rem 0 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--c-surface) 60%, transparent);
+}
+
+.article-toc-inline {
+  display: none;
+}
+
+@media (max-width: 1023.98px), (orientation: portrait) {
+  .article-toc-rail {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279.98px) and (orientation: landscape) {
+  .article-toc-inline {
+    display: block;
+  }
+}
+
+@media (orientation: portrait) {
+  .article-toc-aside {
+    display: none;
+  }
+}
+
+/* 右侧目录列表的高度：目录下方挂广告位时收窄一屏 */
+.article-toc-nav {
+  max-height: calc(100dvh - 12rem);
+}
+
+.doc-aside-stack .article-toc-nav {
+  max-height: calc(100dvh - 21rem);
+}
+
+/* ---------- 侧栏广告位 ----------
+   只出现在有右侧空位的宽屏横屏（与 .article-toc-aside 同条件），
+   窄屏/竖屏没有富余空间，广告位与设置里的开关一起隐藏。 */
+.ad-slot {
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed var(--c-line-strong);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--c-surface) 55%, transparent);
+}
+
+@media (max-width: 1279.98px), (orientation: portrait) {
+  .settings-support {
+    display: none;
+  }
+}
+
+.toc-rail {
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  /* 触屏左右滑动即翻章节；鼠标可滚轮横移（见组件内 wheel 处理） */
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.toc-rail::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-rail__item {
+  flex: 0 0 auto;
+  padding: 0.34rem 0.7rem;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-surface);
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--c-ink-faint);
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+.toc-rail__item[data-level='3'] {
+  font-size: 11px;
+}
+
+.toc-rail__item[data-active='true'] {
+  color: var(--c-primary-ink);
+  border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
+  background: color-mix(in srgb, var(--c-primary) 10%, var(--c-surface));
+}
+
+@media (hover: hover) {
+  .toc-rail__item:hover {
+    color: var(--c-ink-soft);
+    border-color: var(--c-line-strong);
+  }
+
+  .toc-rail__item[data-active='true']:hover {
+    color: var(--c-primary-ink);
+    border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <article class="mx-auto w-full max-w-[860px]">
+  <article class="mx-auto w-full max-w-[1000px]">
     <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-faint">
       <RouterLink :to="chapterLink" class="transition-colors hover:text-primary-ink">
         {{ doc.chapter?.title || '首页' }}
@@ -145,9 +145,13 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
+    <div v-if="toc.length" class="article-toc-rail">
+      <ArticleToc :toc="toc" variant="rail" />
+    </div>
+
     <details
       v-if="toc.length"
-      class="mt-6 rounded-xl border border-line bg-surface/60 px-4 py-3 xl:hidden"
+      class="article-toc-inline mt-6 rounded-xl border border-line bg-surface/60 px-4 py-3"
     >
       <summary class="cursor-pointer list-none text-[11.5px] font-medium text-ink-soft">
         本文目录 · {{ toc.length }} 项

@@ -2,8 +2,10 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   ChevronRight,
+  HeartHandshake,
   Keyboard,
   LayoutGrid,
+  Megaphone,
   Monitor,
   Moon,
   Radar,
@@ -13,6 +15,7 @@ import {
   Sun,
   X,
 } from '@lucide/vue'
+import { useAds } from '../composables/useAds'
 import { useEasterEgg } from '../composables/useEasterEgg'
 import { useMapView } from '../composables/useMapView'
 import { useShortcuts, openHelp } from '../composables/useShortcuts'
@@ -29,6 +32,7 @@ const emit = defineEmits(['close'])
 const { mode, setMode } = useTheme()
 const { viewMode, supports3d, setView, redetect } = useMapView()
 const { enabled: easterEgg, setEnabled: setEasterEgg } = useEasterEgg()
+const { enabled: ads, setEnabled: setAds } = useAds()
 const panelRef = ref(null)
 const backdropRef = ref(null)
 let lastFocused = null
@@ -311,6 +315,66 @@ onBeforeUnmount(() => {
                     class="shrink-0 text-ink-faint transition-transform duration-200 group-hover:translate-x-0.5"
                   />
                 </button>
+              </div>
+            </section>
+
+            <section class="settings-support mt-5">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-faint">支持</p>
+                <span class="font-mono text-[9px] tracking-[0.16em] text-ink-faint/70">Support</span>
+              </div>
+
+              <div class="mt-2.5 rounded-xl border border-line p-1">
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="ads"
+                  aria-label="启用广告"
+                  class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60"
+                  @click="setAds(!ads)"
+                >
+                  <span
+                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas-soft text-ink-soft"
+                  >
+                    <Megaphone :size="14" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-[12.5px] font-medium text-ink">启用广告</span>
+                    <span class="mt-0.5 block text-[10.5px] leading-relaxed text-ink-faint">
+                      在文章页右侧目录下方显示广告位
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    class="relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full border transition-colors duration-200"
+                    :class="ads ? 'border-primary/60 bg-primary' : 'border-line-strong bg-surface-2'"
+                  >
+                    <span
+                      class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 rounded-full transition-all duration-200"
+                      :class="ads ? 'translate-x-[16px] bg-canvas' : 'translate-x-0 bg-ink-faint'"
+                    />
+                  </span>
+                </button>
+              </div>
+
+              <div class="mt-2.5 rounded-xl border border-line bg-canvas-soft/60 px-3 py-2.5">
+                <p class="flex items-center gap-1.5 text-[11px] font-medium text-ink">
+                  <HeartHandshake :size="12" class="text-primary-ink" />
+                  赞助说明
+                </p>
+                <p class="mt-1.5 text-[10.5px] leading-relaxed text-ink-faint">
+                  全站内容免费、无会员与付费墙，域名、存储与搜索服务由作者自费维持。
+                  广告位只用来抵扣这部分开销；想赞助或投放广告，都欢迎在 GitHub 上联系。
+                </p>
+                <a
+                  href="https://github.com/Glassous/BaguRadar/issues"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="mt-2 inline-flex items-center gap-1 text-[10.5px] font-medium text-primary-ink transition-opacity hover:opacity-80"
+                >
+                  GitHub 联系作者
+                  <ChevronRight :size="11" />
+                </a>
               </div>
             </section>
           </div>
