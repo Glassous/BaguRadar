@@ -4,6 +4,7 @@ import { gsap } from 'gsap'
 import { ListTree, X } from '@lucide/vue'
 import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useShortcuts } from '../composables/useShortcuts'
+import { useSingleHand } from '../composables/useSingleHand'
 
 const props = defineProps({
   toc: { type: Array, default: () => [] },
@@ -12,6 +13,9 @@ const props = defineProps({
 })
 
 const isFab = computed(() => props.variant === 'fab')
+
+// 单手模式：底部按钮组要按"当前页面有没有章节按钮"决定是否上移让位
+const { setTocFabVisible } = useSingleHand()
 
 const activeId = ref('')
 const rootRef = ref(null)
@@ -273,6 +277,7 @@ function handleFabMediaChange(event) {
 onMounted(() => {
   attachScroll()
   if (!isFab.value) return
+  setTocFabVisible(true)
   fabMedia = window.matchMedia(FAB_QUERY)
   fabMedia.addEventListener('change', handleFabMediaChange)
 })
@@ -283,6 +288,8 @@ onBeforeUnmount(() => {
   fabMedia?.removeEventListener('change', handleFabMediaChange)
   dismissOverlay('toc-fab')
   gsap.killTweensOf(shellParts())
+  // 章节按钮随页面卸载后，底部按钮组要回到贴底位置
+  if (isFab.value) setTocFabVisible(false)
 })
 </script>
 

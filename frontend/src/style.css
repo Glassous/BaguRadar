@@ -2106,3 +2106,153 @@ pre.search-target {
     transition-duration: 0ms;
   }
 }
+
+/* ---------- 单手模式（仅窄屏） ----------
+   窄屏把顶部的菜单 / 搜索 / 分享下沉到底部同一侧纵向堆叠，章节悬浮按钮仍在最下方，
+   三个按钮给它让出 48px + 8px 的位置；页面没有章节按钮时（如首页）整组直接贴底。
+   所有规则都带 html[data-single-hand='on']：宽屏即使开关为真也不生效，
+   data-single-hand 也只在 <1024px 且开关打开时为 on。 */
+html[data-single-hand='on'] {
+  /* 底部基准线 = 页边距 + 安全区 + 章节按钮让位 */
+  --sh-base: calc(1rem + var(--safe-bottom) + var(--sh-fab-offset, 0px));
+  /* 同级按钮的纵向间距：48px 按钮 + 8px 间隙 */
+  --sh-step: 56px;
+}
+
+@media (max-width: 1023.98px) {
+  /* 三个入口一起换成底部锚点：位置变化发生在侧栏打开期间（按钮被 v-show 隐藏），
+     所以这里不做 top→bottom 的补间，避免出现按钮横向穿屏的中间态。 */
+  html[data-single-hand='on'] .app-float-toggle,
+  html[data-single-hand='on'] .app-float-action,
+  html[data-single-hand='on'] .app-search--collapsed {
+    top: auto;
+  }
+
+  html[data-single-hand='on'][data-hand='right'] .app-float-toggle,
+  html[data-single-hand='on'][data-hand='right'] .app-float-action,
+  html[data-single-hand='on'][data-hand='right'] .app-search--collapsed,
+  html[data-single-hand='on'][data-hand='right'] .app-float-hint {
+    right: calc(1rem + var(--safe-right));
+    left: auto;
+  }
+
+  html[data-single-hand='on'][data-hand='left'] .app-float-toggle,
+  html[data-single-hand='on'][data-hand='left'] .app-float-action,
+  html[data-single-hand='on'][data-hand='left'] .app-search--collapsed,
+  html[data-single-hand='on'][data-hand='left'] .app-float-hint {
+    left: calc(1rem + var(--safe-left));
+    right: auto;
+  }
+
+  /* 从上到下：菜单、搜索、分享、章节 */
+  html[data-single-hand='on'] .app-float-toggle {
+    bottom: calc(var(--sh-base) + var(--sh-step) * 2);
+  }
+
+  /* 收起态沿用"左右定值把宽度压到 48px"的老做法，展开态仍在顶部整条 */
+  html[data-single-hand='on'] .app-search--collapsed {
+    bottom: calc(var(--sh-base) + var(--sh-step));
+    width: 48px;
+  }
+
+  html[data-single-hand='on'] .app-float-action {
+    bottom: var(--sh-base);
+  }
+
+  /* 复制链接等轻提示落在最上方按钮之上 */
+  html[data-single-hand='on'] .app-float-hint {
+    top: auto;
+    bottom: calc(var(--sh-base) + var(--sh-step) * 3);
+  }
+
+  /* 按钮已经沉到屏幕底部，顶部不再需要为浮动按钮留出 64px 的避让带，
+     正文直接贴顶，只保留硬件安全区。 */
+  html[data-single-hand='on'] .app-scroll {
+    padding-top: var(--safe-top);
+  }
+
+  /* 展开的搜索条回到顶部铺满整条，不跟着圆入口下沉 */
+  html[data-single-hand='on'] .app-search--expanded {
+    top: calc(var(--titlebar-h) + 1rem);
+    bottom: auto;
+    left: calc(var(--safe-left) + 1rem);
+    right: calc(var(--safe-right) + 1rem);
+    width: auto;
+  }
+
+  /* 章节卡片是从按钮上方长出来的，展开后会压在三个按钮上；
+     卡片是不透明圆角矩形，圆角处会露出下面的按钮，所以整组淡出。
+     非单手模式下两者分处屏幕两角，不需要这条规则。 */
+  html[data-single-hand='on']
+    body:has(.toc-fab-root[data-open='true'])
+    :is(.app-float-toggle, .app-float-action, .app-search--collapsed) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* 侧栏底部按钮行：铺到两侧边距，关闭按钮才能贴住行首 / 行尾 */
+  html[data-single-hand='on'] .sidebar-bottom-row {
+    right: calc(18px + var(--safe-right));
+  }
+
+  /* 320px 视口下三个按钮同行会超出，允许它们按比例收缩 */
+  html[data-single-hand='on'] .sidebar-bottom-row > * {
+    min-width: 0;
+  }
+
+  html[data-single-hand='on'] .sidebar-bottom-row button,
+  html[data-single-hand='on'] .sidebar-bottom-row .install-action {
+    flex-shrink: 1;
+  }
+
+  /* 列表整体靠下：滚动区一直铺到侧栏底边，内容不足一屏时用 margin-top: auto
+     把整块目录压到按钮行上方（拇指够得到），超出时 auto 归零，照常从顶部滚动。
+     底部只留按钮行 36px + 8px 安全间隔。 */
+  html[data-single-hand='on'] .sidebar-list {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: calc(3.75rem + var(--safe-bottom));
+  }
+
+  html[data-single-hand='on'] .sidebar-list > :first-child {
+    margin-top: auto;
+  }
+
+  html[data-single-hand='on'] .sidebar-install-hint {
+    bottom: calc(4rem + var(--safe-bottom));
+  }
+}
+
+/* 左撇子：章节悬浮按钮整体镜像到左下角。
+   GSAP 只按 offsetWidth / offsetHeight 补间，与方向无关，
+   所以这里只镜像锚点与内边距，不动动画。 */
+html[data-single-hand='on'][data-hand='left'] .toc-fab-root {
+  left: calc(1rem + var(--safe-left));
+  right: auto;
+}
+
+html[data-single-hand='on'][data-hand='left'] .toc-fab {
+  left: 0;
+  right: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+html[data-single-hand='on'][data-hand='left'] .toc-fab__trigger {
+  left: 0;
+  right: auto;
+}
+
+html[data-single-hand='on'][data-hand='left'] .toc-fab__panel {
+  padding: 0.9rem 0.95rem 0.55rem 0.5rem;
+}
+
+html[data-single-hand='on'][data-hand='left'] .toc-fab__head {
+  padding-right: 0;
+  padding-left: 1.6rem;
+}
+
+html[data-single-hand='on'][data-hand='left'] .toc-fab__close {
+  left: -0.1rem;
+  right: auto;
+}

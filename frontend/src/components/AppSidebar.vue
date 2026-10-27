@@ -10,6 +10,7 @@ import TaffyPeek from './TaffyPeek.vue'
 import { dismissOverlay, useBackClose } from '../composables/useBackClose'
 import { useCatalog } from '../composables/useCatalog'
 import { useInstallApp } from '../composables/useInstallApp'
+import { useSingleHand } from '../composables/useSingleHand'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -37,6 +38,8 @@ const savedIds = readSavedPath()
 useBackClose('settings', settingsOpen)
 
 const { installed, promptInstall } = useInstallApp()
+// 单手模式把关闭按钮从顶部挪到底部按钮行，靠左还是靠右跟随惯用手设置
+const { singleHandActive, hand } = useSingleHand()
 const installHint = ref('')
 let installHintTimer = 0
 
@@ -225,6 +228,7 @@ ensureCatalog()
           </span>
         </RouterLink>
         <button
+          v-if="!singleHandActive"
           type="button"
           class="relative z-10 ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink lg:hidden"
           aria-label="关闭目录"
@@ -237,7 +241,7 @@ ensureCatalog()
       <div
         ref="scrollRef"
         v-scrollbar
-        class="scroll-area flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2.5 pb-[calc(5rem+var(--safe-bottom))] pt-14 wco:pt-3"
+        class="sidebar-list scroll-area flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2.5 pb-[calc(5rem+var(--safe-bottom))] pt-14 wco:pt-3"
       >
         <div class="grid h-10 items-center px-2">
           <Transition :name="levelTransition">
@@ -347,13 +351,27 @@ ensureCatalog()
         <p
           v-if="installHint"
           role="status"
-          class="pointer-events-none absolute right-[18px] bottom-[60px] left-[calc(18px+var(--safe-left))] z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-center text-[11px] leading-relaxed text-ink-faint shadow-soft backdrop-blur"
+          class="sidebar-install-hint pointer-events-none absolute right-[18px] bottom-[60px] left-[calc(18px+var(--safe-left))] z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-center text-[11px] leading-relaxed text-ink-faint shadow-soft backdrop-blur"
         >
           {{ installHint }}
         </p>
       </Transition>
 
-      <div class="absolute bottom-[calc(1rem+var(--safe-bottom))] left-[calc(18px+var(--safe-left))] z-10 flex items-center gap-2">
+      <div
+        class="sidebar-bottom-row absolute bottom-[calc(1rem+var(--safe-bottom))] left-[calc(18px+var(--safe-left))] z-10 flex items-center gap-2"
+      >
+        <!-- 单手模式：关闭按钮从顶部下沉到这一行。左撇子占行首、右撇子占行尾 -->
+        <button
+          v-if="singleHandActive"
+          type="button"
+          class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-faint shadow-soft transition-all duration-200 hover:border-primary/45 hover:text-primary-ink hover:shadow-lg"
+          :class="hand === 'right' ? 'order-last ml-auto' : ''"
+          aria-label="关闭目录"
+          @click="emit('close')"
+        >
+          <X :size="15" />
+        </button>
+
         <button
           type="button"
           class="inline-flex h-9 w-[104px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink-soft shadow-soft transition-all duration-200 hover:border-primary/45 hover:text-primary-ink hover:shadow-lg"

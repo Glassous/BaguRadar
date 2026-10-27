@@ -2,6 +2,8 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   ChevronRight,
+  Hand,
+  HandHelping,
   HeartHandshake,
   Keyboard,
   LayoutGrid,
@@ -11,6 +13,7 @@ import {
   Radar,
   RotateCcw,
   Settings2,
+  Smartphone,
   Sparkles,
   Sun,
   X,
@@ -19,6 +22,7 @@ import { useAds } from '../composables/useAds'
 import { useEasterEgg } from '../composables/useEasterEgg'
 import { useMapView } from '../composables/useMapView'
 import { useShortcuts, openHelp } from '../composables/useShortcuts'
+import { useSingleHand } from '../composables/useSingleHand'
 import { useTheme } from '../composables/useTheme'
 
 const WARM_UP_DURATION = 160
@@ -33,6 +37,7 @@ const { mode, setMode } = useTheme()
 const { viewMode, supports3d, setView, redetect } = useMapView()
 const { enabled: easterEgg, setEnabled: setEasterEgg } = useEasterEgg()
 const { enabled: ads, setEnabled: setAds } = useAds()
+const { enabled: singleHand, hand, setEnabled: setSingleHand, setHand } = useSingleHand()
 const panelRef = ref(null)
 const backdropRef = ref(null)
 let lastFocused = null
@@ -42,6 +47,13 @@ const options = [
   { value: 'system', label: '跟随系统', icon: Monitor },
   { value: 'light', label: '亮色', icon: Sun },
   { value: 'dark', label: '深色', icon: Moon },
+]
+
+// 惯用手：决定单手模式下浮动按钮与侧栏关闭按钮贴哪一侧。
+// 左撇子排在左边、右撇子排在右边，和按钮实际飞到的那一侧对应。
+const handOptions = [
+  { value: 'left', label: '左撇子', icon: HandHelping },
+  { value: 'right', label: '右撇子', icon: Hand },
 ]
 
 // 知识地图默认视图：与首页知识地图右上角的切换器共用同一份持久化偏好
@@ -266,7 +278,7 @@ onBeforeUnmount(() => {
                   role="switch"
                   :aria-checked="easterEgg"
                   aria-label="探头彩蛋"
-                  class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60"
+                  class="hidden w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60 lg:flex"
                   @click="setEasterEgg(!easterEgg)"
                 >
                   <span
@@ -315,6 +327,89 @@ onBeforeUnmount(() => {
                     class="shrink-0 text-ink-faint transition-transform duration-200 group-hover:translate-x-0.5"
                   />
                 </button>
+              </div>
+            </section>
+
+            <!-- 单手模式只在窄屏有意义：宽屏整块隐藏，设置也不会生效 -->
+            <section class="mt-5 lg:hidden">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-ink-faint">
+                  单手操作
+                </p>
+                <span class="font-mono text-[9px] tracking-[0.16em] text-ink-faint/70">One-hand</span>
+              </div>
+
+              <div class="mt-2.5 rounded-xl border border-line p-1">
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="singleHand"
+                  aria-label="单手模式"
+                  class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-200 hover:bg-surface-2/60"
+                  @click="setSingleHand(!singleHand)"
+                >
+                  <span
+                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-canvas-soft text-ink-soft"
+                  >
+                    <Smartphone :size="14" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-[12.5px] font-medium text-ink">单手模式</span>
+                    <span class="mt-0.5 block text-[10.5px] leading-relaxed text-ink-faint">
+                      菜单、搜索、分享沉到底部，拇指直接够得到
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    class="relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full border transition-colors duration-200"
+                    :class="singleHand ? 'border-primary/60 bg-primary' : 'border-line-strong bg-surface-2'"
+                  >
+                    <span
+                      class="absolute top-1/2 left-[3px] size-4 -translate-y-1/2 rounded-full transition-all duration-200"
+                      :class="singleHand ? 'translate-x-[16px] bg-canvas' : 'translate-x-0 bg-ink-faint'"
+                    />
+                  </span>
+                </button>
+              </div>
+
+              <!-- 未开单手模式时整块收起：惯用手在这些布局里没有任何可见效果。
+                   网格行高 0fr → 1fr 的过渡贴合内容实际高度，比 max-height 更干净；
+                   折叠时内容仍可被读屏/键盘触达，用 inert 一并挡掉。 -->
+              <div
+                class="hand-picker grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+                :class="singleHand ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+                :inert="!singleHand"
+              >
+                <div class="min-h-0 overflow-hidden">
+                  <div class="flex items-baseline justify-between gap-2 pt-3">
+                    <p class="text-[11px] font-medium text-ink-soft">惯用手</p>
+                    <span class="text-[10px] text-ink-faint">决定按钮靠左还是靠右</span>
+                  </div>
+
+                  <div
+                    class="mt-1.5 flex gap-1 rounded-xl border border-line bg-canvas-soft p-1"
+                    role="radiogroup"
+                    aria-label="惯用手"
+                  >
+                    <button
+                      v-for="option in handOptions"
+                      :key="option.value"
+                      type="button"
+                      role="radio"
+                      :aria-checked="hand === option.value"
+                      class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] px-2 py-[7px] text-[12px] font-medium transition-all duration-200"
+                      :class="
+                        hand === option.value
+                          ? 'bg-primary-soft text-primary-ink ring-1 ring-primary/30'
+                          : 'text-ink-soft hover:bg-surface hover:text-ink'
+                      "
+                      @click="setHand(option.value)"
+                    >
+                      <component :is="option.icon" :size="14" />
+                      <span>{{ option.label }}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
 
