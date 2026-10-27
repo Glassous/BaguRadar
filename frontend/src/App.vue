@@ -134,9 +134,9 @@ onBeforeUnmount(() => {
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="app-float-toggle fixed left-[calc(0.75rem+var(--safe-left))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface shadow-soft transition-[left,box-shadow,border-color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:shadow-lg lg:size-10"
+      class="app-float-toggle fixed left-[calc(1rem+var(--safe-left))] z-30 inline-flex size-12 cursor-pointer items-center justify-center rounded-full border border-line bg-canvas shadow-soft transition-[left,box-shadow,border-color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:shadow-lg lg:size-11"
       :class="[
-        sidebarCollapsed ? '' : 'lg:left-[324px]',
+        sidebarCollapsed ? '' : 'lg:left-[328px]',
         searchPushed ? 'pointer-events-none -translate-x-[160%] opacity-0' : '',
       ]"
       aria-label="切换侧栏"
@@ -146,7 +146,7 @@ onBeforeUnmount(() => {
       :aria-expanded="!sidebarCollapsed"
       @click="toggleSidebar"
     >
-      <span class="flex w-[18px] flex-col items-start gap-[5px] lg:w-4">
+      <span class="flex w-5 flex-col items-start gap-[5px] lg:w-[18px]">
         <span class="block h-[1.5px] w-full rounded-full bg-ink-soft" />
         <span class="block h-[1.5px] w-[58%] rounded-full bg-ink-soft" />
       </span>
@@ -155,14 +155,14 @@ onBeforeUnmount(() => {
     <button
       v-show="!sidebarOpen"
       type="button"
-      class="app-float-action fixed right-[calc(0.75rem+var(--safe-right))] z-30 inline-flex size-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-soft shadow-soft transition-[box-shadow,border-color,color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-10"
+      class="app-float-action fixed right-[calc(1rem+var(--safe-right))] z-30 inline-flex size-12 cursor-pointer items-center justify-center rounded-full border border-line bg-canvas text-ink-soft shadow-soft transition-[box-shadow,border-color,color,transform,opacity] duration-300 ease-out hover:border-primary/45 hover:text-primary-ink hover:shadow-lg lg:size-11"
       :class="searchPushed ? 'pointer-events-none translate-x-[160%] opacity-0' : ''"
       aria-label="复制本页链接"
       :aria-keyshortcuts="route.name === 'doc' ? 'c' : undefined"
       v-tooltip="copyLinkTip"
       @click="copyPageLink"
     >
-      <Share2 :size="16" />
+      <Share2 :size="18" />
     </button>
 
     <AppSearch
@@ -180,7 +180,7 @@ onBeforeUnmount(() => {
       <p
         v-if="toast"
         role="status"
-        class="app-float-hint pointer-events-none fixed right-[calc(0.75rem+var(--safe-right))] z-30 rounded-full border border-line bg-surface/95 px-3 py-1 text-[11px] leading-none text-ink-faint shadow-soft backdrop-blur"
+        class="app-float-hint pointer-events-none fixed right-[calc(1rem+var(--safe-right))] z-30 rounded-full border border-line bg-surface/95 px-3 py-1 text-[11px] leading-none text-ink-faint shadow-soft backdrop-blur"
       >
         {{ toast }}
       </p>
@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
     <main
       ref="mainRef"
       v-scrollbar
-      class="app-scroll h-full overflow-y-auto pt-14 pl-[var(--safe-left)] pr-[var(--safe-right)] transition-[margin-left] duration-300 ease-out lg:pt-0"
+      class="app-scroll h-full overflow-y-auto pt-16 pl-[var(--safe-left)] pr-[var(--safe-right)] transition-[margin-left] duration-300 ease-out lg:pt-0"
       :class="sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-[312px]'"
     >
       <RouterView />

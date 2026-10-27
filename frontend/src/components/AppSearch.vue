@@ -56,9 +56,9 @@ const rootClass = computed(() => ({
   'app-search--ready': ready.value,
 }))
 
-// 侧栏展开时搜索条跟随浮动按钮右移（桌面端）
+// 侧栏展开时搜索条跟随浮动按钮右移（桌面端）：1rem 外边距 + 44px 按钮 + 8px 间隙
 const rootStyle = computed(() => ({
-  '--search-left': props.collapsed ? '3.75rem' : '23.25rem',
+  '--search-left': props.collapsed ? '4.25rem' : '23.75rem',
 }))
 
 useBackClose('search', expanded)

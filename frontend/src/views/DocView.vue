@@ -421,5 +421,8 @@ watch(() => route.fullPath, load, { immediate: true })
         <AdSlot v-if="adsEnabled" class="mt-4" />
       </div>
     </aside>
+
+    <!-- 窄屏 / 竖屏下的章节切换：右下角悬浮按钮展开为大卡片 -->
+    <ArticleToc v-if="!loading && !error && doc && toc.length" :toc="toc" variant="fab" />
   </div>
 </template>

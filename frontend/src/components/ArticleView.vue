@@ -145,10 +145,6 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div v-if="toc.length" class="article-toc-rail">
-      <ArticleToc :toc="toc" variant="rail" />
-    </div>
-
     <details
       v-if="toc.length"
       class="article-toc-inline mt-6 rounded-xl border border-line bg-surface/60 px-4 py-3"

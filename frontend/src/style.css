@@ -94,12 +94,12 @@
 
 .app-float-toggle,
 .app-float-action {
-  top: calc(var(--titlebar-h) + 0.75rem);
+  top: calc(var(--titlebar-h) + 1rem);
 }
 
 /* 右上角分享按钮下方的轻量反馈（如“链接已复制”） */
 .app-float-hint {
-  top: calc(var(--titlebar-h) + 4.25rem);
+  top: calc(var(--titlebar-h) + 5rem);
 }
 
 /* ---------- Taffy 探头彩蛋 ----------
@@ -1101,27 +1101,13 @@ body > .mermaidTooltip {
   background: var(--c-primary);
 }
 
-/* ---------- 文章目录：竖屏 / 窄屏改为顶部横向滑动 ----------
+/* ---------- 文章目录：竖屏 / 窄屏改为右下角悬浮按钮 ----------
    三种形态互斥：
-   - 竖屏或 <1024px：顶部横向章节条（.article-toc-rail）
+   - 竖屏或 <1024px：右下角悬浮按钮 + 展开的大卡片（.toc-fab），不再横向滑动翻章节
    - 1024–1279px 且横屏：折叠面板（.article-toc-inline），顶栏位置留给左上角浮动按钮
    - 横屏 ≥1280px：右侧竖排目录（.article-toc-aside） */
-.article-toc-rail {
-  display: none;
-  margin: 1.5rem 0 0;
-  padding: 0.4rem 0.55rem;
-  border-radius: 0.85rem;
-  background: color-mix(in srgb, var(--c-surface) 60%, transparent);
-}
-
 .article-toc-inline {
   display: none;
-}
-
-@media (max-width: 1023.98px), (orientation: portrait) {
-  .article-toc-rail {
-    display: block;
-  }
 }
 
 @media (min-width: 1024px) and (max-width: 1279.98px) and (orientation: landscape) {
@@ -1142,12 +1128,55 @@ body > .mermaidTooltip {
 }
 
 .doc-aside-stack .article-toc-nav {
-  max-height: calc(100dvh - 21rem);
+  max-height: calc(100dvh - 28rem);
 }
 
 /* ---------- 侧栏广告位 ----------
    只出现在有右侧空位的宽屏横屏（与 .article-toc-aside 同条件），
    窄屏/竖屏没有富余空间，广告位与设置里的开关一起隐藏。 */
+.ad-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 真实投放：图片按容器裁切，始终取中间部分 */
+.ad-live {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--c-surface) 55%, transparent);
+  transition: opacity 0.2s ease;
+}
+
+.ad-live:hover {
+  opacity: 0.88;
+}
+
+.ad-live-img {
+  display: block;
+  width: 100%;
+  height: 6.5rem;
+  object-fit: cover;
+  object-position: center;
+}
+
+.ad-live-tag {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 0.25rem;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
 .ad-slot {
   padding: 0.75rem 0.85rem;
   border: 1px dashed var(--c-line-strong);
@@ -1161,60 +1190,247 @@ body > .mermaidTooltip {
   }
 }
 
-.toc-rail {
+/* ---------- 右下角悬浮章节选择 ----------
+   窄屏 / 竖屏专用：按钮和卡片是同一个元素（.toc-fab），
+   收起态是 48px 圆按钮，展开态是整张大卡片，尺寸与圆角由 GSAP 补间。
+   横屏 ≥1024px 不渲染该入口，仍走右侧竖排目录 / 折叠面板。 */
+.toc-fab-root {
+  position: fixed;
+  right: calc(1rem + var(--safe-right));
+  bottom: calc(1rem + var(--safe-bottom));
+  z-index: 30;
+  display: none;
+  width: 48px;
+  height: 48px;
+  /* 展开后的卡片宽度：量目标尺寸、裁切内容都用它，中途不会重排 */
+  --toc-fab-w: min(344px, calc(100vw - 2rem - var(--safe-left) - var(--safe-right)));
+}
+
+@media (max-width: 1023.98px), (orientation: portrait) {
+  .toc-fab-root {
+    display: block;
+  }
+}
+
+/* 同一个元素：圆按钮长成卡片，内容只是被它裁切出来 */
+.toc-fab {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
   display: flex;
-  gap: 0.375rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  /* 触屏左右滑动即翻章节；鼠标可滚轮横移（见组件内 wheel 处理） */
-  touch-action: pan-x;
+  align-items: flex-end;
+  justify-content: flex-end;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 24px;
+  /* 与页面底色一致：展开时也不额外叠一层底色 / 阴影 */
+  background: var(--c-canvas);
+  box-sizing: border-box;
+}
+
+.toc-fab-root[data-open='true'] .toc-fab {
+  width: var(--toc-fab-w);
+  height: auto;
+  border-radius: 17px;
+}
+
+.toc-fab__trigger {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 23px;
+  background: transparent;
+  color: var(--c-ink-soft);
+  cursor: pointer;
+  transition: color 160ms var(--ease-out);
+}
+
+.toc-fab__trigger:active {
+  color: var(--c-primary-ink);
+}
+
+/* 内容按展开尺寸排布并右下角对齐：卡片长大时只做裁切，文字不会跟着重排 */
+.toc-fab__panel {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: var(--toc-fab-w);
+  max-height: min(62dvh, 440px);
+  padding: 0.9rem 0.5rem 0.55rem 0.95rem;
+  box-sizing: border-box;
+  outline: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.toc-fab__head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-right: 1.6rem;
+}
+
+.toc-fab__close {
+  position: absolute;
+  top: -0.15rem;
+  right: -0.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  transition:
+    color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .toc-fab__close:hover {
+    background: color-mix(in srgb, var(--c-ink) 6%, transparent);
+    color: var(--c-ink);
+  }
+}
+
+.toc-fab__eyebrow {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+
+.toc-fab__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.toc-fab__title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-ink);
+}
+
+.toc-fab__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--c-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.toc-fab__list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  margin-top: 0.55rem;
+  padding-right: 0.45rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.toc-rail::-webkit-scrollbar {
+.toc-fab__list::-webkit-scrollbar {
   width: 0;
   height: 0;
   display: none;
 }
 
-.toc-rail__item {
-  flex: 0 0 auto;
-  padding: 0.34rem 0.7rem;
-  border: 1px solid var(--c-line);
-  border-radius: 999px;
-  background: var(--c-surface);
-  font-size: 11.5px;
-  line-height: 1.4;
-  white-space: nowrap;
+.toc-fab__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: transparent;
   color: var(--c-ink-faint);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
   transition:
     color 160ms var(--ease-out),
-    background-color 160ms var(--ease-out),
-    border-color 160ms var(--ease-out);
+    background-color 160ms var(--ease-out);
 }
 
-.toc-rail__item[data-level='3'] {
-  font-size: 11px;
+.toc-fab__item[data-level='3'] {
+  padding-left: 1.6rem;
+  font-size: 11.5px;
 }
 
-.toc-rail__item[data-active='true'] {
+.toc-fab__item[data-active='true'] {
   color: var(--c-primary-ink);
-  border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
-  background: color-mix(in srgb, var(--c-primary) 10%, var(--c-surface));
+  /* 只用中性底色标记当前位置，不铺一层带色相的光晕 */
+  background: color-mix(in srgb, var(--c-ink) 5%, transparent);
+}
+
+.toc-fab__index {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--c-ink-faint);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.toc-fab__item[data-active='true'] .toc-fab__index {
+  color: var(--c-primary-ink);
+  opacity: 1;
+}
+
+.toc-fab__label {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 @media (hover: hover) {
-  .toc-rail__item:hover {
+  .toc-fab__item:hover {
     color: var(--c-ink-soft);
-    border-color: var(--c-line-strong);
+    background: color-mix(in srgb, var(--c-ink) 4%, transparent);
   }
 
-  .toc-rail__item[data-active='true']:hover {
+  .toc-fab__item[data-active='true']:hover {
     color: var(--c-primary-ink);
-    border-color: color-mix(in srgb, var(--c-primary) 42%, var(--c-line));
   }
+}
+
+/* 整屏透明热区：只负责接住“点外面关闭”，不压暗背景、不模糊 */
+.toc-fab__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  pointer-events: none;
+}
+
+.toc-fab-root[data-open='true'] .toc-fab__scrim {
+  pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1234,22 +1450,23 @@ body > .mermaidTooltip {
 
 /* ---------- 顶栏搜索 ---------- */
 /* 窄屏：收起时是分享按钮左侧的圆形入口，展开后独占整条顶栏。
-   left/right 都写成具体长度，才能让“圆形 ↔ 长条”的宽度变化可过渡。 */
+   left/right 都写成具体长度，才能让“圆形 ↔ 长条”的宽度变化可过渡。
+   尺寸与间距跟着两侧浮动按钮走：1rem 外边距 + 48px 按钮 + 8px 间隙。 */
 .app-search {
   position: fixed;
   z-index: 45;
-  top: calc(var(--titlebar-h) + 0.75rem);
-  left: calc(100% - var(--safe-right) - 0.75rem - 52px - 44px);
-  right: calc(var(--safe-right) + 0.75rem + 52px);
-  height: 44px;
+  top: calc(var(--titlebar-h) + 1rem);
+  left: calc(100% - var(--safe-right) - 1rem - 56px - 48px);
+  right: calc(var(--safe-right) + 1rem + 56px);
+  height: 48px;
   transition:
     left 320ms var(--ease-out),
     right 320ms var(--ease-out);
 }
 
 .app-search--expanded {
-  left: calc(var(--safe-left) + 0.75rem);
-  right: calc(var(--safe-right) + 0.75rem);
+  left: calc(var(--safe-left) + 1rem);
+  right: calc(var(--safe-right) + 1rem);
 }
 
 /* 首帧不做位移动画：刷新后搜索框本来就在它的位置上 */
@@ -1259,17 +1476,17 @@ body > .mermaidTooltip {
 
 @media (min-width: 1024px) {
   .app-search--desktop {
-    left: var(--search-left, 3.75rem);
+    left: var(--search-left, 4.25rem);
     right: auto;
-    width: 260px;
-    height: 40px;
+    width: 264px;
+    height: 44px;
     transition:
       left 320ms var(--ease-out),
       width 240ms var(--ease-out);
   }
 
   .app-search--desktop.app-search--panel {
-    width: 320px;
+    width: 324px;
   }
 }
 
@@ -1298,6 +1515,8 @@ body > .mermaidTooltip {
   gap: 0;
   padding: 0;
   cursor: pointer;
+  /* 收起后和左右两个浮动按钮同款：底色取页面底色，而不是另一层白 */
+  background: color-mix(in srgb, var(--c-canvas) 92%, transparent);
 }
 
 .app-search__bar.is-focused {
@@ -1321,8 +1540,8 @@ body > .mermaidTooltip {
 
 /* 收起态是圆形按钮，图标要比长条里更粗更大，才和两侧浮动按钮同重量 */
 .app-search--collapsed .app-search__icon {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
   stroke-width: 2.4;
   color: var(--c-ink-soft);
 }
@@ -1450,7 +1669,7 @@ body > .mermaidTooltip {
   left: 0;
   display: flex;
   flex-direction: column;
-  width: min(600px, calc(100vw - var(--search-left, 3.75rem) - 1.5rem));
+  width: min(600px, calc(100vw - var(--search-left, 4.25rem) - 1.5rem));
   max-height: min(60vh, 520px);
   overflow: hidden;
   border: 1px solid var(--c-line);
@@ -1463,10 +1682,10 @@ body > .mermaidTooltip {
 
 .app-search:not(.app-search--desktop) .app-search__panel {
   position: fixed;
-  top: calc(var(--titlebar-h) + 0.75rem + 44px + 10px);
-  right: calc(var(--safe-right) + 0.75rem);
-  bottom: calc(var(--safe-bottom) + 0.75rem);
-  left: calc(var(--safe-left) + 0.75rem);
+  top: calc(var(--titlebar-h) + 1rem + 48px + 10px);
+  right: calc(var(--safe-right) + 1rem);
+  bottom: calc(var(--safe-bottom) + 1rem);
+  left: calc(var(--safe-left) + 1rem);
   width: auto;
   max-height: none;
   border-radius: 18px;
